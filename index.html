@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IT Issue Reporting</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/davidshimjs-qrcodejs@0.0.2/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --text:#1b1e27; --muted:#767b8a;
+  --border:#e7e9f0; --accent:#4f46e5; --accent-soft:color-mix(in srgb,var(--accent) 12%,var(--card)); --accent-fg:#ffffff;
+  --danger:#e0332f; --danger-soft:#fdeaea;
+  --warn:#c8720a; --warn-soft:#fdf3e2;
+  --ok:#0e8f52; --ok-soft:#e6f7ee;
+  --radius:14px; --radius-sm:9px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%;}
+*{box-sizing:border-box;}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;}
+.wrap{max-width:720px;margin:0 auto;padding:28px 18px 60px;}
+h1{font-size:1.4rem;margin:4px 0 2px;font-weight:700;letter-spacing:-0.01em;}
+.sub{color:var(--muted);font-size:.92rem;margin-bottom:22px;line-height:1.4;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;
+  margin-bottom:16px;box-shadow:0 1px 2px rgba(20,20,43,.03);}
+label{display:block;font-size:.82rem;font-weight:600;color:var(--text);margin:16px 0 6px;}
+label:first-child{margin-top:0;}
+input,select,textarea{width:100%;padding:11px 13px;border-radius:var(--radius-sm);border:1.5px solid var(--border);
+  background:var(--bg);color:var(--text);font-size:.95rem;font-family:inherit;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--card);}
+textarea{min-height:90px;resize:vertical;}
+button{cursor:pointer;border:none;border-radius:var(--radius-sm);padding:12px 18px;font-size:.95rem;font-weight:600;
+  transition:opacity .15s, transform .05s;}
+button:active{transform:scale(.98);}
+.btn-primary{background:var(--accent);color:var(--accent-fg);width:100%;margin-top:18px;}
+.btn-primary:hover{opacity:.92;}
+.btn-primary:disabled{opacity:.5;cursor:default;}
+.btn-ghost{background:var(--accent-soft);color:var(--accent);border:1px solid transparent;}
+.btn-ghost:hover{opacity:.85;}
+.row{display:flex;gap:10px;align-items:center;}
+.grow{flex:1;}
+.badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
+.badge-open{background:var(--danger-soft);color:var(--danger);}
+.badge-in-progress{background:var(--warn-soft);color:var(--warn);}
+.badge-resolved{background:var(--ok-soft);color:var(--ok);}
+.ticket{border:1px solid var(--border);border-radius:var(--radius-sm);padding:15px;margin-bottom:10px;background:var(--card);}
+.ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.ticket-meta{color:var(--muted);font-size:.78rem;margin-top:5px;}
+.ticket-desc{margin-top:9px;font-size:.9rem;line-height:1.45;}
+.status-select{width:auto;padding:7px 10px;font-size:.78rem;margin-top:11px;}
+.empty{color:var(--muted);text-align:center;padding:34px 10px;font-size:.9rem;background:var(--card);
+  border:1px dashed var(--border);border-radius:var(--radius);}
+.loc-item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);}
+.loc-item:last-child{border-bottom:none;}
+.loc-name{font-weight:600;}
+.loc-count{color:var(--muted);font-size:.8rem;}
+.qr-modal-bg{position:fixed;inset:0;background:rgba(20,20,43,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+.qr-modal{background:var(--card);border-radius:var(--radius);padding:26px;max-width:340px;width:100%;text-align:center;
+  box-shadow:0 20px 60px rgba(20,20,43,.25);}
+.qr-modal canvas,.qr-modal img{max-width:100%;border-radius:8px;}
+#qrCanvas{display:flex;justify-content:center;}
+.qr-modal .url{font-size:.72rem;color:var(--muted);word-break:break-all;margin:12px 0;}
+.msg{text-align:center;padding:60px 16px;}
+.msg .big{font-size:2.4rem;}
+.add-row{display:flex;gap:8px;margin-top:6px;}
+.add-row input{flex:1;}
+.add-row button{white-space:nowrap;}
+.link-btn{background:none;border:none;color:var(--accent);font-size:.8rem;padding:0;font-weight:600;}
+table{width:100%;border-collapse:collapse;}
+:root[data-theme="dark"]{--bg:#0e1016;--card:#171a23;--text:#e8eaf0;--muted:#8d92a3;--border:#252937;
+  --danger-soft:#3b1c1e;--warn-soft:#3a2a12;--ok-soft:#0f3022;}
+.card,.ticket{transition:box-shadow .15s,border-color .15s;}
+.ticket:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(20,20,43,.06);}
+.shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh;}
+.side{position:sticky;top:0;align-self:start;height:100vh;background:var(--card);border-right:1px solid var(--border);
+  padding:20px 14px;display:flex;flex-direction:column;gap:4px;}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1rem;padding:2px 8px 20px;}
+.logo{width:34px;height:34px;flex:none;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:.8rem;font-weight:800;}
+.nav{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;color:var(--muted);font-weight:600;font-size:.9rem;cursor:pointer;transition:.15s;}
+.nav:hover{background:var(--bg);color:var(--text);}
+.nav.active{background:var(--accent-soft);color:var(--accent);}
+.nav svg{width:19px;height:19px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.nav-sep{height:1px;background:var(--border);margin:10px 4px;}
+.side-foot{margin-top:auto;}
+.side-foot a{text-decoration:none;}
+.main{padding:30px 34px 60px;max-width:1040px;width:100%;min-width:0;}
+.ct{font-size:1rem;margin:0 0 12px;font-weight:700;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px;margin-bottom:16px;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px;}
+.stat b{display:block;font-size:1.6rem;letter-spacing:-.02em;}
+.stat span{color:var(--muted);font-size:.78rem;font-weight:600;}
+.bar-row{display:grid;grid-template-columns:130px 1fr 34px;gap:10px;align-items:center;font-size:.85rem;padding:5px 0;}
+.bar{height:8px;background:var(--bg);border-radius:8px;overflow:hidden;}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:8px;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-top:8px;}
+.swatches{display:flex;gap:10px;flex-wrap:wrap;}
+.sw{width:32px;height:32px;padding:0;border-radius:50%;border:3px solid transparent;}
+.sw.on{border-color:var(--text);}
+.copy-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+.copy-row input{flex:1;font-size:.82rem;}
+.tbl{width:100%;border-collapse:collapse;font-size:.85rem;white-space:nowrap;}
+.tbl th{text-align:left;padding:11px 12px;color:var(--muted);font-size:.74rem;font-weight:700;border-bottom:1.5px solid var(--border);background:var(--bg);}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);}
+.tbl tbody tr:last-child td{border-bottom:none;}
+.tbl tbody tr:hover{background:var(--bg);}
+details.card>summary{cursor:pointer;font-weight:700;list-style:none;}
+details.card>summary::-webkit-details-marker{display:none;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chips label{margin:0;display:flex;align-items:center;gap:7px;padding:7px 13px;border:1.5px solid var(--border);border-radius:20px;font-size:.85rem;font-weight:600;cursor:pointer;background:var(--bg);}
+.chips input{width:auto;margin:0;}
+.chips label:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}
+.exp-row{display:grid;grid-template-columns:1fr 120px 42px;gap:8px;margin-bottom:8px;}
+.exp-row button{padding:0;}
+.day-h{display:flex;justify-content:space-between;align-items:baseline;margin:22px 0 10px;font-weight:700;}
+.day-h span{color:var(--muted);font-size:.82rem;font-weight:600;}
+.edit-modal{text-align:left;max-width:480px;max-height:90vh;overflow-y:auto;}
+a.btn-ghost{display:inline-block;text-decoration:none;border-radius:var(--radius-sm);padding:12px 18px;font-size:.95rem;font-weight:600;text-align:center;}
+.hist{border-left:2px solid var(--border);margin-left:8px;padding:0 0 16px 18px;position:relative;}
+.hist:before{content:"";position:absolute;left:-7px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--accent);}
+.hist b{font-size:.9rem;}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;}
+.acts button{padding:11px 2px;font-size:.76rem;}
+.acts button.on{background:var(--accent);color:var(--accent-fg);}
+@media(max-width:820px){.two{grid-template-columns:1fr;}}
+@media(max-width:760px){
+  .shell{grid-template-columns:62px 1fr;}
+  .side{padding:14px 8px;}
+  .nav span,.bt{display:none;}
+  .nav{justify-content:center;padding:12px 0;}
+  .brand{justify-content:center;padding:2px 0 16px;}
+  .main{padding:22px 14px 50px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="msg"><div class="big">⏳</div><p>Loading…</p></div></div>
+
+<script>
+const CATEGORIES = ["Hardware","Software","Network/Wi-Fi","Printer","Account/Access","POS Terminal","Other"];
+const URGENCY = ["Low","Medium","High","Critical"];
+const STATUSES = ["open","in-progress","resolved"];
+const URGENCY_HOURS = {Critical:4, High:24, Medium:72, Low:168};
+
+// ========== FIREBASE CONFIG — replace with your own from Firebase console ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyCA8gPnXDlxN1eWoazJMA9UjC3Zqg88v00",
+  authDomain: "itndsticket.firebaseapp.com",
+  projectId: "itndsticket",
+  storageBucket: "itndsticket.firebasestorage.app",
+  messagingSenderId: "403748061583",
+  appId: "1:403748061583:web:5bea3c7088517b418f4bfa"
+};
+// =====================================================================================
+
+let dbError = '';
+function loadScript(src){
+  return new Promise(res => { const el = document.createElement('script'); el.src = src; el.onload = () => res(true); el.onerror = () => res(false); document.head.appendChild(el); });
+}
+async function ensureFirebase(){
+  if (window.firebase && firebase.firestore) return;
+  // primary CDN failed or was blocked — try a fallback mirror
+  const base = 'https://cdn.jsdelivr.net/npm/firebase@10.7.1/';
+  await loadScript(base + 'firebase-app-compat.js');
+  await loadScript(base + 'firebase-firestore-compat.js');
+}
+function initFirestore(){
+  try {
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") { dbError = 'The Firebase config still has placeholder values.'; return null; }
+    if (!window.firebase || !firebase.firestore) { dbError = 'The Firebase library could not be loaded (offline, or gstatic.com / jsdelivr.net is blocked by a network, ad-blocker or CSP).'; return null; }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const fdb = firebase.firestore();
+    try { fdb.settings({experimentalAutoDetectLongPolling: true, merge: true}); } catch(e){}
+    return {
+      doc(path){
+        const ref = fdb.doc(path);
+        return {
+          async set(data){ return ref.set(data, {merge:true}); },
+          async update(data){ return ref.update(data); },
+          async delete(){ return ref.delete(); },
+          async get(){ const snap = await ref.get(); return snap.exists ? {data: snap.data()} : null; }
+        };
+      },
+      collection(path){
+        const ref = fdb.collection(path);
+        return {
+          async get(){ const snap = await ref.get(); return {docs: snap.docs.map(d => ({data: d.data()}))}; }
+        };
+      }
+    };
+  } catch(e){ dbError = (e && e.message) || 'Firebase failed to initialise.'; return null; }
+}
+
+let db = null;
+const params = new URLSearchParams(location.search);
+const view = params.get('view'); // 'form' or 'admin' — no other way in
+
+function pageBaseUrl(){
+  return location.origin + location.pathname;
+}
+function formUrl(){ return pageBaseUrl() + '?view=form'; }
+function adminUrl(){ return pageBaseUrl() + '?view=admin'; }
+
+async function init(){
+  await ensureFirebase();
+  db = initFirestore();
+  try {
+    await loadSettings();
+    if (view === 'form') {
+      await renderForm();
+    } else if (view === 'asset') {
+      await renderAssetPage(params.get('id'));
+    } else {
+      await renderAdmin();
+    }
+  } catch(e){
+    document.getElementById('app').innerHTML = '<div class="msg"><div class="big">⚠️</div><h1>Something went wrong</h1><p class="sub">' + escapeHtml(e && e.message ? e.message : 'Please refresh the page.') + '</p></div>';
+  }
+}
+
+// ---------- FORM VIEW ----------
+async function renderForm(){
+  const app = document.getElementById('app');
+  const locations = db ? await fetchAll('locations') : [];
+  const assets = db ? await fetchAll('assets') : [];
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  const assetOptions = (locId) => {
+    const filtered = assets.filter(a => a.locationId === locId);
+    return '<option value="">None</option>' + filtered.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  };
+  app.innerHTML = `
+    <h1>Report an IT Issue</h1>
+    <div class="sub">Fill this in and IT will pick it up.</div>
+    <div class="card">
+      <label>Location</label>
+      <select id="f_loc">
+        ${locations.length ? locations.map(l=>`<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('') : '<option value="">No locations set up yet</option>'}
+      </select>
+      <label>Related asset (optional)</label>
+      <select id="f_asset">${locations.length ? assetOptions(locations[0].id) : '<option value="">None</option>'}</select>
+      <label>Person raising the ticket</label>
+      <input id="f_name" type="text" placeholder="e.g. Nadeesha Perera">
+      <label>Department</label>
+      <input id="f_dept" type="text" placeholder="e.g. Sales, Warehouse">
+      <label>Request</label>
+      <select id="f_cat">${CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      <label>Urgency</label>
+      <select id="f_urg">${URGENCY.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>
+      <label>Issue</label>
+      <textarea id="f_desc" placeholder="What's happening? What have you already tried?"></textarea>
+      <button class="btn-primary" id="submitBtn">Submit Ticket</button>
+      <div id="formMsg" class="ticket-meta" style="margin-top:10px;"></div>
+    </div>
+  `;
+  document.getElementById('f_loc').onchange = (e) => {
+    document.getElementById('f_asset').innerHTML = assetOptions(e.target.value);
+  };
+  document.getElementById('submitBtn').onclick = () => submitTicket(locations, assets);
+  const preId = params.get('asset'); const pa = preId && assets.find(x => x.id === preId);
+  if (pa) {
+    document.getElementById('f_loc').value = pa.locationId;
+    document.getElementById('f_asset').innerHTML = assetOptions(pa.locationId);
+    document.getElementById('f_asset').value = pa.id;
+  }
+}
+
+async function submitTicket(locations, assets){
+  const locId = document.getElementById('f_loc').value;
+  const loc = locations.find(l => l.id === locId);
+  const assetId = document.getElementById('f_asset').value;
+  const asset = assets.find(a => a.id === assetId);
+  const name = document.getElementById('f_name').value.trim();
+  const dept = document.getElementById('f_dept').value.trim();
+  const desc = document.getElementById('f_desc').value.trim();
+  const cat = document.getElementById('f_cat').value;
+  const urg = document.getElementById('f_urg').value;
+  const msgEl = document.getElementById('formMsg');
+  if (!locId) { msgEl.textContent = "Please select a location."; msgEl.style.color = 'var(--danger)'; return; }
+  if (!desc) { msgEl.textContent = "Please describe the issue."; msgEl.style.color = 'var(--danger)'; return; }
+  if (!db) { msgEl.textContent = "This form isn't connected to a database yet — contact the site admin." + (dbError ? " (" + dbError + ")" : ""); msgEl.style.color='var(--danger)'; return; }
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = "Submitting…";
+  const id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  const createdAt = Date.now();
+  try {
+    await db.doc('tickets/' + id).set({
+      id, locationId: locId, locationName: loc ? loc.name : locId,
+      assetId: assetId || null, assetName: asset ? asset.name : null,
+      reporterName: name || 'Anonymous', department: dept,
+      category: cat, urgency: urg, description: desc,
+      status: 'open', assignedTo: '',
+      dueBy: createdAt + (URGENCY_HOURS[urg] || 72) * 3600000,
+      createdAt
+    });
+    document.getElementById('app').innerHTML = `
+      <div class="msg"><div class="big">✅</div>
+      <h1>Ticket submitted</h1>
+      <p class="sub">IT has been notified. Thanks for the report!</p></div>`;
+  } catch(e){
+    btn.disabled = false; btn.textContent = "Submit Ticket";
+    msgEl.textContent = "Couldn't submit — please check your connection and try again.";
+    msgEl.style.color = 'var(--danger)';
+  }
+}
+
+// ---------- ADMIN VIEW ----------
+let adminTab = 'tickets';
+let statusFilter = 'all';
+let locFilter = 'all';
+let assetLocFilter = 'all';
+
+const SETTINGS = {orgName:'IT Desk', currency:'LKR', theme:'light', accent:'#4f46e5'};
+const ICONS = {
+  tickets:'<path d="M3 9V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v3a2.5 2.5 0 0 0 0 5v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a2.5 2.5 0 0 0 0-5z"/><path d="M9 8v8"/>',
+  reports:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  assets:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  locations:'<path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  work:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4v2h6V4M9 11h6M9 15h4"/>',
+  settings:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'
+};
+const NAV = [
+  ['tickets','Tickets','Track, assign and resolve reported issues.'],
+  ['reports','Reports','Trends, workload and resolution stats.'],
+  ['assets','IT Assets','Keep an inventory of devices per location.'],
+  ['work','Work Log','Log daily work with locations, notes and expenses.'],
+  ['locations','Locations & QR','Manage sites and share the report form.'],
+  ['settings','Settings','Organisation, locations, asset types, appearance and data.']
+];
+const ACCENTS = ['#4f46e5','#0ea5e9','#0e8f52','#e0332f','#c8720a','#9333ea'];
+
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+function applyAppearance(){
+  const dark = SETTINGS.theme === 'dark' || (SETTINGS.theme === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.documentElement.style.setProperty('--accent', SETTINGS.accent);
+}
+async function loadSettings(){
+  SETTINGS.theme = lsGet('it_theme') || 'light';
+  SETTINGS.accent = lsGet('it_accent') || '#4f46e5';
+  applyAppearance();
+  if (!db) return;
+  try {
+    const r = await db.doc('settings/general').get();
+    if (r && r.data) {
+      if (r.data.orgName) SETTINGS.orgName = r.data.orgName;
+      if (r.data.currency !== undefined) SETTINGS.currency = r.data.currency;
+      if (Array.isArray(r.data.assetTypes) && r.data.assetTypes.length) { ASSET_TYPES.length = 0; ASSET_TYPES.push(...r.data.assetTypes); }
+    }
+  } catch(e){}
+}
+
+// ---------- LOGIN GATE (Work Log + Settings) ----------
+const AUTH_TABS = ['work','settings'];
+const isUnlocked = () => { try { return sessionStorage.getItem('it_unlocked') === '1'; } catch(e){ return false; } };
+const setUnlocked = v => { try { v ? sessionStorage.setItem('it_unlocked','1') : sessionStorage.removeItem('it_unlocked'); } catch(e){} };
+const toHex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+const newSalt = () => toHex(crypto.getRandomValues(new Uint8Array(16)));
+async function hashPw(user, pw, saltHex){
+  if (!(window.crypto && crypto.subtle)) throw new Error('Secure login needs HTTPS (or localhost).');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(user.toLowerCase() + ':' + pw), 'PBKDF2', false, ['deriveBits']);
+  const salt = Uint8Array.from(saltHex.match(/../g).map(h => parseInt(h, 16)));
+  return toHex(await crypto.subtle.deriveBits({name:'PBKDF2', salt, iterations:150000, hash:'SHA-256'}, key, 256));
+}
+let loginFails = 0;
+async function renderLogin(){
+  const body = document.getElementById('tabBody');
+  let cred = null;
+  try { const r = await db.doc('settings/auth').get(); cred = r && r.data; }
+  catch(e){ body.innerHTML = `<div class="empty">Couldn't check the login settings — check your connection and Firestore rules (settings), then refresh.</div>`; return; }
+  const setup = !cred;
+  body.innerHTML = `
+    <div class="card" style="max-width:420px;">
+      <h2 class="ct">${setup ? 'Set up admin login' : '🔒 Sign in'}</h2>
+      <div class="ticket-meta">${setup ? 'Work Log and Settings will ask for this username and password.' : 'Enter your username and password to open this section.'}</div>
+      <label>Username</label><input id="l_user" type="text" autocomplete="username">
+      <label>Password</label><input id="l_pw" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}">
+      ${setup ? '<label>Confirm password</label><input id="l_pw2" type="password" autocomplete="new-password">' : ''}
+      <button class="btn-primary" id="l_go">${setup ? 'Create login' : 'Sign in'}</button>
+      <div id="l_msg" class="ticket-meta" style="margin-top:10px;"></div>
+    </div>`;
+  const msg = document.getElementById('l_msg');
+  const err = t => { msg.style.color = 'var(--danger)'; msg.textContent = t; };
+  const go = async () => {
+    const user = document.getElementById('l_user').value.trim(), pw = document.getElementById('l_pw').value;
+    const btn = document.getElementById('l_go'); btn.disabled = true;
+    try {
+      if (setup) {
+        if (user.length < 3) return err('Username must be at least 3 characters.');
+        if (pw.length < 6) return err('Password must be at least 6 characters.');
+        if (pw !== document.getElementById('l_pw2').value) return err('Passwords do not match.');
+        const salt = newSalt();
+        await db.doc('settings/auth').set({user, salt, hash: await hashPw(user, pw, salt)});
+      } else {
+        if (loginFails) await new Promise(r => setTimeout(r, Math.min(loginFails, 5) * 1000));
+        if (user.toLowerCase() !== (cred.user || '').toLowerCase() || (await hashPw(cred.user, pw, cred.salt)) !== cred.hash) { loginFails++; return err('Incorrect username or password.'); }
+      }
+      loginFails = 0; setUnlocked(true); renderAdmin();
+    } catch(e){ err(e.message || 'Something went wrong.'); }
+    finally { btn.disabled = false; }
+  };
+  document.getElementById('l_go').onclick = go;
+  body.querySelectorAll('input').forEach(i => i.onkeydown = e => { if (e.key === 'Enter') go(); });
+  document.getElementById('l_user').focus();
+}
+
+async function renderAdmin(){
+  const app = document.getElementById('app');
+  app.className = 'shell';
+  const cur = NAV.find(n => n[0] === adminTab) || NAV[0];
+  app.innerHTML = `
+    <aside class="side">
+      <div class="brand"><div class="logo">IT</div><span class="bt">${escapeHtml(SETTINGS.orgName)}</span></div>
+      ${NAV.map(n => `<div class="nav ${adminTab===n[0]?'active':''}" data-tab="${n[0]}" title="${n[1]}"><svg viewBox="0 0 24 24">${ICONS[n[0]]}</svg><span>${n[1]}</span></div>`).join('')}
+      <div class="side-foot"><div class="nav-sep"></div>
+        ${isUnlocked() ? '<div class="nav" id="lockBtn" title="Lock Work Log &amp; Settings"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Lock</span></div>' : ''}
+        <a class="nav" href="${formUrl()}" target="_blank" title="Open public form"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span>Public form</span></a>
+      </div>
+    </aside>
+    <main class="main">
+      <h1>${cur[1]}</h1>
+      <div class="sub">${cur[2]}</div>
+      <div id="tabBody"></div>
+    </main>
+  `;
+  app.querySelectorAll('.nav[data-tab]').forEach(t => t.onclick = () => { adminTab = t.dataset.tab; renderAdmin(); });
+  const lockBtn = document.getElementById('lockBtn');
+  if (lockBtn) lockBtn.onclick = () => { setUnlocked(false); if (AUTH_TABS.includes(adminTab)) adminTab = 'tickets'; renderAdmin(); };
+  if (!db) {
+    document.getElementById('tabBody').innerHTML = `<div class="empty">Couldn't connect to Firebase. ${escapeHtml(dbError || 'Check the config near the top of the script.')}</div>`;
+    return;
+  }
+  if (AUTH_TABS.includes(adminTab) && !isUnlocked()) { await renderLogin(); return; }
+  if (adminTab === 'tickets') await renderTicketsTab();
+  else if (adminTab === 'reports') await renderReportsTab();
+  else if (adminTab === 'assets') await renderAssetsTab();
+  else if (adminTab === 'work') await renderWorkTab();
+  else if (adminTab === 'settings') await renderSettingsTab();
+  else await renderLocationsTab();
+}
+
+async function fetchAll(collection){
+  try {
+    const snap = await db.collection(collection).get();
+    return (snap && snap.docs) ? snap.docs.map(d => d.data) : [];
+  } catch(e){ return []; }
+}
+
+async function renderTicketsTab(){
+  const body = document.getElementById('tabBody');
+  const [tickets, locations] = await Promise.all([fetchAll('tickets'), fetchAll('locations')]);
+  tickets.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+
+  const locOptions = ['all', ...locations.map(l=>l.id)];
+  body.innerHTML = `
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <select id="statusFilter" style="width:auto;">
+        <option value="all">All statuses</option>
+        ${STATUSES.map(s=>`<option value="${s}" ${statusFilter===s?'selected':''}>${label(s)}</option>`).join('')}
+      </select>
+      <select id="locFilter" style="width:auto;">
+        <option value="all">All locations</option>
+        ${locations.map(l=>`<option value="${l.id}" ${locFilter===l.id?'selected':''}>${escapeHtml(l.name)}</option>`).join('')}
+      </select>
+      <button class="btn-ghost" id="exportTicketsCsv" style="margin-left:auto;">Export CSV</button>
+    </div>
+    <div id="ticketList"></div>
+  `;
+  document.getElementById('statusFilter').value = statusFilter;
+  document.getElementById('locFilter').value = locFilter;
+  document.getElementById('statusFilter').onchange = e => { statusFilter = e.target.value; renderTicketsTab(); };
+  document.getElementById('locFilter').onchange = e => { locFilter = e.target.value; renderTicketsTab(); };
+  document.getElementById('exportTicketsCsv').onclick = () => exportCsv('tickets',
+    ['id','locationName','assetName','reporterName','department','category','urgency','status','assignedTo','description','createdAt','dueBy'], tickets);
+
+  let filtered = tickets;
+  if (statusFilter !== 'all') filtered = filtered.filter(t => t.status === statusFilter);
+  if (locFilter !== 'all') filtered = filtered.filter(t => t.locationId === locFilter);
+
+  const list = document.getElementById('ticketList');
+  if (!filtered.length) { list.innerHTML = `<div class="empty">No tickets match this filter.</div>`; return; }
+  const now = Date.now();
+  list.innerHTML = filtered.map(t => {
+    const overdue = t.status !== 'resolved' && t.dueBy && t.dueBy < now;
+    return `
+    <div class="ticket">
+      <div class="ticket-top">
+        <div>
+          <span class="badge badge-${t.status}">${label(t.status)}</span>
+          ${overdue ? '<span class="badge badge-open" style="margin-left:6px;">Overdue</span>' : ''}
+          <div class="ticket-meta">${escapeHtml(t.locationName||t.locationId)}${t.assetName ? ' · ' + escapeHtml(t.assetName) : ''} · ${escapeHtml(t.category)} · ${escapeHtml(t.urgency)} urgency</div>
+        </div>
+        <div class="ticket-meta">${timeAgo(t.createdAt)}</div>
+      </div>
+      <div class="ticket-desc">${escapeHtml(t.description)}</div>
+      <div class="ticket-meta">Reported by ${escapeHtml(t.reporterName)}${t.department ? ' · ' + escapeHtml(t.department) : ''}${t.dueBy ? ' · Due ' + new Date(t.dueBy).toLocaleString() : ''}</div>
+      <div class="row" style="margin-top:11px;flex-wrap:wrap;gap:8px;">
+        <select class="status-select" data-id="${t.id}" style="margin-top:0;">
+          ${STATUSES.map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${label(s)}</option>`).join('')}
+        </select>
+        <input class="assign-input" data-id="${t.id}" type="text" value="${escapeHtml(t.assignedTo||'')}" placeholder="Assign to…" style="width:auto;flex:1;min-width:120px;padding:7px 10px;font-size:.78rem;">
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.status-select').forEach(sel => {
+    sel.onchange = async () => {
+      sel.disabled = true;
+      try { await db.doc('tickets/' + sel.dataset.id).update({status: sel.value, resolvedAt: sel.value === 'resolved' ? Date.now() : null}); }
+      finally { renderTicketsTab(); }
+    };
+  });
+  list.querySelectorAll('.assign-input').forEach(inp => {
+    inp.onchange = async () => {
+      try { await db.doc('tickets/' + inp.dataset.id).update({assignedTo: inp.value.trim()}); } catch(e){}
+    };
+  });
+}
+
+function toCsvValue(v){
+  const s = v == null ? '' : String(v);
+  return '"' + s.replace(/"/g,'""') + '"';
+}
+async function exportCsv(name, cols, rows){
+  const lines = [cols.join(',')];
+  rows.forEach(r => {
+    lines.push(cols.map(c => {
+      let v = r[c];
+      if (c === 'createdAt' || c === 'dueBy') v = v ? new Date(v).toISOString() : '';
+      return toCsvValue(v);
+    }).join(','));
+  });
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.csv';
+  a.click();
+}
+
+function monthKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function monthLabel(key){
+  const [y,m] = key.split('-');
+  return new Date(y, m-1, 1).toLocaleString('default',{month:'long', year:'numeric'});
+}
+
+let reportRange = '30';
+function bars(obj){
+  const keys = Object.keys(obj).sort((a,b) => obj[b]-obj[a]);
+  const max = Math.max(1, ...keys.map(k => obj[k]));
+  return keys.map(k => `<div class="bar-row"><span>${escapeHtml(k)}</span><div class="bar"><i style="width:${obj[k]/max*100}%"></i></div><b>${obj[k]}</b></div>`).join('') || '<div class="ticket-meta">No data</div>';
+}
+function fmtDuration(ms){
+  const h = ms/3600000;
+  return h < 1 ? Math.round(h*60) + 'm' : h < 48 ? h.toFixed(1) + 'h' : (h/24).toFixed(1) + 'd';
+}
+
+async function renderReportsTab(){
+  const body = document.getElementById('tabBody');
+  const all = await fetchAll('tickets');
+  const cutoff = reportRange === 'all' ? 0 : Date.now() - (+reportRange) * 86400000;
+  const tickets = all.filter(t => (t.createdAt||0) >= cutoff);
+  const rangeSel = `<select id="rangeSel" style="width:auto;">
+      ${[['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days'],['365','Last year'],['all','All time']].map(o=>`<option value="${o[0]}" ${reportRange===o[0]?'selected':''}>${o[1]}</option>`).join('')}
+    </select>`;
+  const bind = () => {
+    document.getElementById('rangeSel').onchange = e => { reportRange = e.target.value; renderReportsTab(); };
+    const ex = document.getElementById('exportFullCsv');
+    if (ex) ex.onclick = () => exportCsv('tickets_report',
+      ['id','locationName','assetName','reporterName','department','category','urgency','status','assignedTo','description','createdAt','dueBy'], tickets);
+    const pr = document.getElementById('printBtn'); if (pr) pr.onclick = () => window.print();
+  };
+  if (!tickets.length) { body.innerHTML = `<div class="row" style="margin-bottom:14px;">${rangeSel}</div><div class="empty">No tickets in this period.</div>`; bind(); return; }
+
+  const now = Date.now();
+  const st = {open:0, 'in-progress':0, resolved:0, overdue:0};
+  const byMonth = {}, byLoc = {}, byCat = {}, byUrg = {}, byDept = {};
+  const durs = [];
+  const blank = () => ({total:0, open:0, inprog:0, resolved:0});
+  const bump = (m, k, t) => { m[k] = m[k] || blank(); m[k].total++; if (t.status==='resolved') m[k].resolved++; else if (t.status==='in-progress') m[k].inprog++; else m[k].open++; };
+  tickets.forEach(t => {
+    st[t.status] = (st[t.status]||0) + 1;
+    if (t.status !== 'resolved' && t.dueBy && t.dueBy < now) st.overdue++;
+    if (t.status === 'resolved' && t.resolvedAt && t.createdAt) durs.push(t.resolvedAt - t.createdAt);
+    bump(byMonth, monthKey(t.createdAt || now), t);
+    bump(byLoc, t.locationName || t.locationId || 'Unknown', t);
+    byCat[t.category||'Other'] = (byCat[t.category||'Other']||0) + 1;
+    byUrg[t.urgency||'Medium'] = (byUrg[t.urgency||'Medium']||0) + 1;
+    if (t.department) byDept[t.department] = (byDept[t.department]||0) + 1;
+  });
+  const avg = durs.length ? fmtDuration(durs.reduce((a,b)=>a+b,0)/durs.length) : '—';
+  const rate = Math.round((st.resolved / tickets.length) * 100);
+  const th = 'text-align:left;padding:9px 8px;border-bottom:1.5px solid var(--border);color:var(--muted);font-size:.78rem;font-weight:700;';
+  const td = 'padding:9px 8px;border-bottom:1px solid var(--border);';
+  const tbl = (first, map, keys) => `<div style="overflow-x:auto;"><table style="font-size:.85rem;">
+    <thead><tr>${[first,'Total','Open','In Progress','Resolved'].map(h=>`<th style="${th}">${h}</th>`).join('')}</tr></thead>
+    <tbody>${keys.map(k => { const r = map[k]; return `<tr><td style="${td}">${escapeHtml(first==='Month'?monthLabel(k):k)}</td><td style="${td}">${r.total}</td><td style="${td}">${r.open}</td><td style="${td}">${r.inprog}</td><td style="${td}">${r.resolved}</td></tr>`; }).join('')}</tbody></table></div>`;
+
+  body.innerHTML = `
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">${rangeSel}
+      <button class="btn-ghost" id="printBtn" style="margin-left:auto;">Print</button>
+      <button class="btn-ghost" id="exportFullCsv">Export CSV</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${tickets.length}</b><span>Total tickets</span></div>
+      <div class="stat"><b style="color:var(--danger)">${st.open||0}</b><span>Open</span></div>
+      <div class="stat"><b style="color:var(--warn)">${st['in-progress']||0}</b><span>In progress</span></div>
+      <div class="stat"><b style="color:var(--ok)">${st.resolved||0}</b><span>Resolved (${rate}%)</span></div>
+      <div class="stat"><b style="color:var(--danger)">${st.overdue}</b><span>Overdue</span></div>
+      <div class="stat"><b>${avg}</b><span>Avg. resolution</span></div>
+    </div>
+    <div class="two">
+      <div class="card"><h2 class="ct">By category</h2>${bars(byCat)}</div>
+      <div class="card"><h2 class="ct">By urgency</h2>${bars(byUrg)}</div>
+    </div>
+    ${Object.keys(byDept).length ? `<div class="card"><h2 class="ct">Top departments</h2>${bars(byDept)}</div>` : ''}
+    <div class="card"><h2 class="ct">Monthly report</h2>${tbl('Month', byMonth, Object.keys(byMonth).sort().reverse())}</div>
+    <div class="card"><h2 class="ct">Location report</h2>${tbl('Location', byLoc, Object.keys(byLoc).sort())}</div>
+  `;
+  bind();
+}
+
+// ---------- SETTINGS TAB ----------
+async function renderSettingsTab(){
+  const body = document.getElementById('tabBody');
+  const locations = await fetchAll('locations');
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  body.innerHTML = `
+    <div class="card">
+      <h2 class="ct">General</h2>
+      <label>Organisation / team name</label>
+      <input id="s_org" type="text" value="${escapeHtml(SETTINGS.orgName)}">
+      <label>Currency label for expenses</label>
+      <input id="s_cur" type="text" maxlength="6" value="${escapeHtml(SETTINGS.currency)}" placeholder="e.g. LKR, USD">
+      <button class="btn-primary" id="saveSettings">Save</button>
+      <div id="setMsg" class="ticket-meta" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <h2 class="ct">Locations</h2>
+      <div class="add-row" style="margin-top:0;">
+        <input id="s_newLoc" type="text" placeholder="e.g. Colombo Store">
+        <button class="btn-primary" style="width:auto;margin-top:0;" id="s_addLoc">Add</button>
+      </div>
+      <div id="s_locMsg" class="ticket-meta" style="margin-top:8px;"></div>
+      <div id="s_locList" style="margin-top:6px;"></div>
+    </div>
+    <div class="card">
+      <h2 class="ct">Asset types</h2>
+      <div class="add-row" style="margin-top:0;">
+        <input id="s_newType" type="text" placeholder="e.g. Scanner, CCTV camera">
+        <button class="btn-primary" style="width:auto;margin-top:0;" id="s_addType">Add</button>
+      </div>
+      <div id="s_typeMsg" class="ticket-meta" style="margin-top:8px;"></div>
+      <div id="s_typeList" style="margin-top:6px;"></div>
+    </div>
+    <div class="card">
+      <h2 class="ct">Admin login</h2>
+      <div class="ticket-meta">Change the username or password for Work Log and Settings. Leave the new password empty to keep the current one.</div>
+      <label>Current password</label><input id="c_cur" type="password" autocomplete="current-password">
+      <label>Username</label><input id="c_user" type="text" autocomplete="username">
+      <label>New password</label><input id="c_new" type="password" autocomplete="new-password">
+      <button class="btn-primary" id="c_go">Update login</button>
+      <div id="c_msg" class="ticket-meta" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <h2 class="ct">Appearance <span class="ticket-meta" style="font-weight:400;">(saved on this device)</span></h2>
+      <label>Theme</label>
+      <select id="s_theme">${[['light','Light'],['dark','Dark'],['auto','Match system']].map(o=>`<option value="${o[0]}" ${SETTINGS.theme===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
+      <label>Accent colour</label>
+      <div class="swatches">${ACCENTS.map(c => `<button class="sw ${SETTINGS.accent===c?'on':''}" data-c="${c}" style="background:${c};" aria-label="${c}"></button>`).join('')}</div>
+    </div>
+    <div class="card">
+      <h2 class="ct">Links</h2>
+      <label>Public report form</label>
+      <div class="copy-row"><input readonly value="${escapeHtml(formUrl())}"><button class="btn-ghost copy-btn" data-v="${escapeHtml(formUrl())}">Copy</button></div>
+      <label>Admin dashboard</label>
+      <div class="copy-row"><input readonly value="${escapeHtml(adminUrl())}"><button class="btn-ghost copy-btn" data-v="${escapeHtml(adminUrl())}">Copy</button></div>
+      <button class="btn-ghost" id="setQr">Show form QR code</button>
+    </div>
+    <div class="card">
+      <h2 class="ct">Data export</h2>
+      <div class="row" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn-ghost" data-x="tickets">Tickets CSV</button>
+        <button class="btn-ghost" data-x="assets">Assets CSV</button>
+        <button class="btn-ghost" data-x="locations">Locations CSV</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('saveSettings').onclick = async () => {
+    const msg = document.getElementById('setMsg');
+    const orgName = document.getElementById('s_org').value.trim() || 'IT Desk';
+    try {
+      const currency = document.getElementById('s_cur').value.trim();
+      await db.doc('settings/general').set({orgName, currency});
+      SETTINGS.orgName = orgName; SETTINGS.currency = currency;
+      msg.style.color = 'var(--ok)'; msg.textContent = 'Settings saved.';
+      document.querySelector('.bt').textContent = orgName;
+    } catch(e){ msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't save — check your connection and Firestore rules."; }
+  };
+  const drawLocs = () => {
+    const list = document.getElementById('s_locList');
+    list.innerHTML = locations.length
+      ? locations.map(l => `<div class="loc-item"><div class="loc-name">${escapeHtml(l.name)}</div><button class="btn-ghost del-loc" data-id="${l.id}" style="color:var(--danger);padding:7px 12px;font-size:.8rem;">Delete</button></div>`).join('')
+      : '<div class="ticket-meta">No locations yet.</div>';
+    list.querySelectorAll('.del-loc').forEach(b => b.onclick = async () => {
+      const l = locations.find(x => x.id === b.dataset.id), msg = document.getElementById('s_locMsg');
+      b.disabled = true;
+      const [as, ts] = await Promise.all([fetchAll('assets'), fetchAll('tickets')]);
+      const na = as.filter(x => x.locationId === l.id).length, nt = ts.filter(x => x.locationId === l.id).length;
+      let q = 'Delete "' + l.name + '"?';
+      if (na || nt) q += '\n\n' + na + ' asset(s) and ' + nt + ' ticket(s) use this location. They keep the old name, but it will no longer be selectable.';
+      if (!confirm(q)) { b.disabled = false; return; }
+      try {
+        await db.doc('locations/' + l.id).delete();
+        locations.splice(locations.indexOf(l), 1);
+        msg.style.color = 'var(--ok)'; msg.textContent = 'Deleted "' + l.name + '".'; drawLocs();
+      } catch(e){ b.disabled = false; msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't delete — check your Firestore rules allow deletes."; }
+    });
+  };
+  drawLocs();
+  const addLoc = async () => {
+    const inp = document.getElementById('s_newLoc'), msg = document.getElementById('s_locMsg');
+    const name = inp.value.trim();
+    if (!name) return;
+    if (locations.some(l => (l.name||'').toLowerCase() === name.toLowerCase())) { msg.style.color = 'var(--danger)'; msg.textContent = 'That location already exists.'; return; }
+    const id = 'loc_' + Date.now().toString(36);
+    try {
+      await db.doc('locations/' + id).set({id, name, createdAt: Date.now()});
+      locations.push({id, name}); locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+      inp.value = ''; msg.style.color = 'var(--ok)'; msg.textContent = 'Added “' + name + '”.'; drawLocs();
+    } catch(e){ msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't add — check your connection and Firestore rules."; }
+  };
+  document.getElementById('s_addLoc').onclick = addLoc;
+  document.getElementById('s_newLoc').onkeydown = e => { if (e.key === 'Enter') addLoc(); };
+  const saveTypes = () => db.doc('settings/general').set({assetTypes: ASSET_TYPES.slice()});
+  const drawTypes = () => {
+    const list = document.getElementById('s_typeList'), msg = document.getElementById('s_typeMsg');
+    list.innerHTML = ASSET_TYPES.map(t => `<div class="loc-item"><div class="loc-name">${escapeHtml(t)}</div><button class="btn-ghost del-type" data-t="${escapeHtml(t)}" style="color:var(--danger);padding:7px 12px;font-size:.8rem;">Delete</button></div>`).join('');
+    list.querySelectorAll('.del-type').forEach(b => b.onclick = async () => {
+      const t = b.dataset.t;
+      if (ASSET_TYPES.length <= 1) { msg.style.color = 'var(--danger)'; msg.textContent = 'Keep at least one asset type.'; return; }
+      const n = (await fetchAll('assets')).filter(x => x.type === t).length;
+      if (!confirm('Delete type "' + t + '"?' + (n ? '\n\n' + n + ' asset(s) use it and will keep this type name.' : ''))) return;
+      const prev = ASSET_TYPES.slice();
+      ASSET_TYPES.splice(ASSET_TYPES.indexOf(t), 1);
+      try { await saveTypes(); msg.style.color = 'var(--ok)'; msg.textContent = 'Deleted "' + t + '".'; }
+      catch(e){ ASSET_TYPES.length = 0; ASSET_TYPES.push(...prev); msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't delete — check your connection and Firestore rules."; }
+      drawTypes();
+    });
+  };
+  drawTypes();
+  const addType = async () => {
+    const inp = document.getElementById('s_newType'), msg = document.getElementById('s_typeMsg');
+    const t = inp.value.trim();
+    if (!t) return;
+    if (ASSET_TYPES.some(x => x.toLowerCase() === t.toLowerCase())) { msg.style.color = 'var(--danger)'; msg.textContent = 'That type already exists.'; return; }
+    ASSET_TYPES.push(t);
+    try { await saveTypes(); inp.value = ''; msg.style.color = 'var(--ok)'; msg.textContent = 'Added "' + t + '".'; }
+    catch(e){ ASSET_TYPES.pop(); msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't add — check your connection and Firestore rules."; }
+    drawTypes();
+  };
+  document.getElementById('s_addType').onclick = addType;
+  document.getElementById('s_newType').onkeydown = e => { if (e.key === 'Enter') addType(); };
+  (async () => { try { const r = await db.doc('settings/auth').get(); if (r && r.data) document.getElementById('c_user').value = r.data.user || ''; } catch(e){} })();
+  document.getElementById('c_go').onclick = async () => {
+    const msg = document.getElementById('c_msg');
+    const err = t => { msg.style.color = 'var(--danger)'; msg.textContent = t; };
+    try {
+      const r = await db.doc('settings/auth').get(), c = r && r.data;
+      const cur = document.getElementById('c_cur').value;
+      if (c && (await hashPw(c.user, cur, c.salt)) !== c.hash) return err('Current password is incorrect.');
+      const user = document.getElementById('c_user').value.trim();
+      const pw = document.getElementById('c_new').value || cur;
+      if (user.length < 3) return err('Username must be at least 3 characters.');
+      if (pw.length < 6) return err('Password must be at least 6 characters.');
+      const salt = newSalt();
+      await db.doc('settings/auth').set({user, salt, hash: await hashPw(user, pw, salt)});
+      ['c_cur','c_new'].forEach(i => document.getElementById(i).value = '');
+      msg.style.color = 'var(--ok)'; msg.textContent = 'Login updated.';
+    } catch(e){ err(e.message || "Couldn't update — check your connection."); }
+  };
+  document.getElementById('s_theme').onchange = e => { SETTINGS.theme = e.target.value; lsSet('it_theme', SETTINGS.theme); applyAppearance(); };
+  body.querySelectorAll('.sw').forEach(b => b.onclick = () => {
+    SETTINGS.accent = b.dataset.c; lsSet('it_accent', SETTINGS.accent); applyAppearance();
+    body.querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b));
+  });
+  body.querySelectorAll('.copy-btn').forEach(b => b.onclick = () => navigator.clipboard.writeText(b.dataset.v).then(() => { b.textContent = 'Copied!'; }));
+  document.getElementById('setQr').onclick = () => showQr();
+  const cols = {
+    tickets:['id','locationName','assetName','reporterName','department','category','urgency','status','assignedTo','description','createdAt','dueBy'],
+    assets:['id','name','type','locationName','serial','status','createdAt'],
+    locations:['id','name','createdAt']
+  };
+  body.querySelectorAll('[data-x]').forEach(b => b.onclick = async () => exportCsv(b.dataset.x, cols[b.dataset.x], await fetchAll(b.dataset.x)));
+}
+
+// ---------- WORK LOG ----------
+let workEditId = null, workMonth = 'all', workLoc = 'all';
+const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const dayName = ds => ds ? new Date(ds + 'T00:00:00').toLocaleDateString('en-US', {weekday:'long'}) : '';
+const money = n => (SETTINGS.currency ? SETTINGS.currency + ' ' : '') + (+n || 0).toLocaleString(undefined, {maximumFractionDigits:2});
+const sumExp = l => (l.expenses || []).reduce((t,e) => t + (+e.amount || 0), 0);
+
+async function renderWorkTab(){
+  const body = document.getElementById('tabBody');
+  const [logs, locations] = await Promise.all([fetchAll('worklogs'), fetchAll('locations')]);
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  const editing = workEditId ? logs.find(l => l.id === workEditId) : null;
+  if (workEditId && !editing) workEditId = null;
+  const cur = editing || {date: todayStr(), work:'', note:'', locationIds:[], expenses:[]};
+  const expRow = (e = {}) => `<div class="exp-row"><input class="x_desc" type="text" placeholder="Expense (e.g. Transport)" value="${escapeHtml(e.desc||'')}"><input class="x_amt" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" value="${e.amount||''}"><button class="btn-ghost x_del" title="Remove">✕</button></div>`;
+
+  body.innerHTML = `
+    <div class="card">
+      <h2 class="ct">${editing ? 'Edit work entry' : 'Add work entry'}</h2>
+      <div class="two" style="gap:12px;">
+        <div><label>Date</label><input id="w_date" type="date" value="${escapeHtml(cur.date)}"></div>
+        <div><label>Day</label><input id="w_day" type="text" readonly value="${dayName(cur.date)}"></div>
+      </div>
+      <label>Work done</label>
+      <textarea id="w_work" placeholder="What did you work on?">${escapeHtml(cur.work)}</textarea>
+      <label>Locations (select one or more)</label>
+      <div class="chips">${locations.length ? locations.map(l => `<label><input type="checkbox" class="w_loc" value="${l.id}" ${(cur.locationIds||[]).includes(l.id)?'checked':''}>${escapeHtml(l.name)}</label>`).join('') : '<span class="ticket-meta">Add locations in Settings first.</span>'}</div>
+      <label>Note</label>
+      <textarea id="w_note" style="min-height:64px;" placeholder="Anything to remember about this work">${escapeHtml(cur.note||'')}</textarea>
+      <label>Expenses (optional)</label>
+      <div id="w_exps">${(cur.expenses||[]).map(expRow).join('')}</div>
+      <div class="row" style="justify-content:space-between;margin-top:4px;">
+        <button class="btn-ghost" id="w_addExp">＋ Add expense</button><b id="w_total"></b>
+      </div>
+      <button class="btn-primary" id="w_save">${editing ? 'Update entry' : 'Save entry'}</button>
+      ${editing ? '<button class="btn-ghost" id="w_cancel" style="width:100%;margin-top:8px;">Cancel</button>' : ''}
+      <div id="w_msg" class="ticket-meta" style="margin-top:10px;"></div>
+    </div>
+    <div id="workList"></div>`;
+
+  const exps = document.getElementById('w_exps');
+  const total = () => { let t = 0; exps.querySelectorAll('.x_amt').forEach(i => t += +i.value || 0); document.getElementById('w_total').textContent = t ? 'Total: ' + money(t) : ''; };
+  total();
+  exps.oninput = total;
+  exps.onclick = e => { const b = e.target.closest('.x_del'); if (b) { b.parentElement.remove(); total(); } };
+  document.getElementById('w_addExp').onclick = () => { exps.insertAdjacentHTML('beforeend', expRow()); exps.lastElementChild.querySelector('input').focus(); };
+  document.getElementById('w_date').onchange = e => { document.getElementById('w_day').value = dayName(e.target.value); };
+  if (editing) document.getElementById('w_cancel').onclick = () => { workEditId = null; renderWorkTab(); };
+
+  document.getElementById('w_save').onclick = async () => {
+    const msg = document.getElementById('w_msg');
+    const date = document.getElementById('w_date').value;
+    const work = document.getElementById('w_work').value.trim();
+    if (!date || !work) { msg.style.color = 'var(--danger)'; msg.textContent = 'Date and work done are required.'; return; }
+    const locationIds = [...body.querySelectorAll('.w_loc:checked')].map(c => c.value);
+    const locationNames = locationIds.map(i => (locations.find(l => l.id === i) || {}).name || i);
+    const expenses = [...exps.querySelectorAll('.exp-row')].map(r => ({desc: r.querySelector('.x_desc').value.trim(), amount: +r.querySelector('.x_amt').value || 0})).filter(e => e.desc || e.amount);
+    const id = editing ? editing.id : 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const btn = document.getElementById('w_save'); btn.disabled = true;
+    try {
+      await db.doc('worklogs/' + id).set({id, date, day: dayName(date), work, note: document.getElementById('w_note').value.trim(),
+        locationIds, locationNames, expenses, total: expenses.reduce((t,e) => t + e.amount, 0), createdAt: editing ? (editing.createdAt || Date.now()) : Date.now()});
+      workEditId = null; await renderWorkTab();
+    } catch(e){ btn.disabled = false; msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't save — check your connection and Firestore rules (worklogs)."; }
+  };
+
+  // ----- list -----
+  const months = [...new Set(logs.map(l => (l.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  let rows = logs.filter(l => l.date);
+  if (workMonth !== 'all') rows = rows.filter(l => l.date.slice(0,7) === workMonth);
+  if (workLoc !== 'all') rows = rows.filter(l => (l.locationIds||[]).includes(workLoc));
+  rows.sort((a,b) => b.date.localeCompare(a.date) || (b.createdAt||0) - (a.createdAt||0));
+  const days = [...new Set(rows.map(l => l.date))];
+  const grand = rows.reduce((t,l) => t + sumExp(l), 0);
+  const list = document.getElementById('workList');
+  list.innerHTML = `
+    <div class="stats" style="margin-top:6px;">
+      <div class="stat"><b>${rows.length}</b><span>Entries</span></div>
+      <div class="stat"><b>${days.length}</b><span>Days worked</span></div>
+      <div class="stat"><b>${money(grand)}</b><span>Total expenses</span></div>
+    </div>
+    <div class="row" style="flex-wrap:wrap;gap:8px;">
+      <select id="wMonth" style="width:auto;"><option value="all">All months</option>${months.map(m => `<option value="${m}" ${workMonth===m?'selected':''}>${monthLabel(m)}</option>`).join('')}</select>
+      <select id="wLoc" style="width:auto;"><option value="all">All locations</option>${locations.map(l => `<option value="${l.id}" ${workLoc===l.id?'selected':''}>${escapeHtml(l.name)}</option>`).join('')}</select>
+      <button class="btn-ghost" id="wExport" style="margin-left:auto;">Export CSV</button>
+    </div>
+    ${rows.length ? days.map(d => {
+      const dayRows = rows.filter(l => l.date === d);
+      const dt = dayRows.reduce((t,l) => t + sumExp(l), 0);
+      return `<div class="day-h"><div>${new Date(d + 'T00:00:00').toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'short', day:'numeric'})}</div><span>${dt ? 'Expenses ' + money(dt) : ''}</span></div>` +
+        dayRows.map(l => `
+        <div class="ticket">
+          <div class="ticket-desc" style="margin-top:0;font-weight:600;white-space:pre-wrap;">${escapeHtml(l.work)}</div>
+          ${(l.locationNames||[]).length ? `<div style="margin-top:9px;">${l.locationNames.map(n => `<span class="badge" style="background:var(--accent-soft);color:var(--accent);margin:0 5px 5px 0;">${escapeHtml(n)}</span>`).join('')}</div>` : ''}
+          ${l.note ? `<div class="ticket-meta" style="white-space:pre-wrap;">📝 ${escapeHtml(l.note)}</div>` : ''}
+          ${(l.expenses||[]).length ? `<table class="tbl" style="margin-top:10px;white-space:normal;">
+            ${l.expenses.map(e => `<tr><td style="padding:6px 0;">${escapeHtml(e.desc||'Expense')}</td><td style="padding:6px 0;text-align:right;">${money(e.amount)}</td></tr>`).join('')}
+            <tr><td style="padding:6px 0;font-weight:700;">Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">${money(sumExp(l))}</td></tr></table>` : ''}
+          <div class="row" style="margin-top:12px;gap:8px;">
+            <button class="btn-ghost w-edit" data-id="${l.id}" style="padding:7px 14px;font-size:.8rem;">Edit</button>
+            <button class="btn-ghost w-del" data-id="${l.id}" style="padding:7px 14px;font-size:.8rem;color:var(--danger);">Delete</button>
+          </div>
+        </div>`).join('');
+    }).join('') : '<div class="empty" style="margin-top:14px;">No work entries yet.</div>'}`;
+  document.getElementById('wMonth').onchange = e => { workMonth = e.target.value; renderWorkTab(); };
+  document.getElementById('wLoc').onchange = e => { workLoc = e.target.value; renderWorkTab(); };
+  document.getElementById('wExport').onclick = () => exportCsv('work_log', ['date','day','work','locations','note','expenses','total'],
+    rows.map(l => ({date:l.date, day:l.day||dayName(l.date), work:l.work, locations:(l.locationNames||[]).join('; '), note:l.note||'',
+      expenses:(l.expenses||[]).map(e => e.desc + ': ' + e.amount).join('; '), total:sumExp(l)})));
+  list.querySelectorAll('.w-edit').forEach(b => b.onclick = () => { workEditId = b.dataset.id; renderWorkTab().then(() => window.scrollTo(0,0)); });
+  list.querySelectorAll('.w-del').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this work entry?')) return;
+    try { await db.doc('worklogs/' + b.dataset.id).delete(); } catch(e){ alert("Couldn't delete — check Firestore rules."); }
+    renderWorkTab();
+  });
+}
+
+// ---------- ASSETS TAB ----------
+const ASSET_TYPES = ["Laptop","Desktop","Monitor","Printer","Router/Switch","POS Terminal","Phone/Tablet","Other"];
+const ASSET_STATUSES = ["Active","In Repair","Retired"];
+
+async function ensureXlsx(){
+  if (window.XLSX) return true;
+  for (const u of ['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'])
+    if (await loadScript(u) && window.XLSX) return true;
+  return false;
+}
+async function exportAssetsXlsx(rows){
+  const v = x => x == null ? '' : x;
+  const fdate = t => t ? new Date(t).toISOString().slice(0,10) : '';
+  const aoa = [['Asset','Type','Location','Assigned to','Serial / tag','Brand / model','Purchase date','Warranty until','Condition','Status','Notes','Added']];
+  rows.forEach(a => aoa.push([a.name, a.type, a.locationName || a.locationId, a.assignedTo, a.serial, a.model, a.purchaseDate, a.warrantyUntil, a.condition || 'Good', a.status || 'Active', a.notes, fdate(a.createdAt)].map(v)));
+  const stamp = todayStr();
+  const save = (blob, name) => { const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = name; l.click(); };
+  if (!(await ensureXlsx())) {
+    // offline fallback: single-sheet file that Excel opens
+    const html = '<html><head><meta charset="UTF-8"></head><body><table border="1">' + aoa.map((r,i) => '<tr>' + r.map(c => `<${i?'td':'th'}>${escapeHtml(c)}</${i?'td':'th'}>`).join('') + '</tr>').join('') + '</table></body></html>';
+    save(new Blob([html], {type:'application/vnd.ms-excel'}), 'asset_report_' + stamp + '.xls');
+    return;
+  }
+  const tally = f => { const m = {}; rows.forEach(a => { const k = f(a) || '—'; m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((x,y) => y[1] - x[1]); };
+  const sum = [['IT Asset Report'], ['Generated', stamp], ['Assets included', rows.length], []];
+  [['By type', a => a.type], ['By location', a => a.locationName || a.locationId], ['By status', a => a.status || 'Active'], ['By condition', a => a.condition || 'Good']]
+    .forEach(([t, f]) => { sum.push([t, 'Count']); tally(f).forEach(r => sum.push(r)); sum.push([]); });
+  const ht = h => [h.type === 'repair' ? (h.outcome === 'completed' ? 'Repair completed' : 'Sent for repair') : '', h.vendor, h.cost ? 'cost ' + h.cost : '',
+    h.type === 'transfer' ? 'Moved ' + (h.from || '—') + ' → ' + h.to + (h.person ? ' · ' + h.person : '') : '',
+    h.type === 'condition' ? 'Condition ' + (h.from || '—') + ' → ' + h.to : '', h.type === 'edit' ? 'Edited: ' + (h.changes || []).join(', ') : '',
+    h.type === 'created' && h.person ? 'Assigned to ' + h.person : '', h.note].filter(Boolean).join(' · ');
+  const hist = [['Asset','Date','Event','Details','By']];
+  rows.forEach(a => (a.history || []).slice().sort((x,y) => (x.at||0) - (y.at||0)).forEach(h => hist.push([a.name, h.at ? new Date(h.at).toLocaleString() : '', h.type, ht(h), h.by || ''])));
+  const wb = XLSX.utils.book_new();
+  [['Assets', aoa], ['Summary', sum], ['History', hist]].forEach(([n, data]) => {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = (data[0] || []).map((_, i) => ({wch: Math.min(48, Math.max(10, ...data.map(r => String(r[i] == null ? '' : r[i]).length)) + 2)}));
+    XLSX.utils.book_append_sheet(wb, ws, n);
+  });
+  XLSX.writeFile(wb, 'asset_report_' + stamp + '.xlsx');
+}
+
+function openAssetEditor(a, locations, done){
+  const bg = document.createElement('div'); bg.className = 'qr-modal-bg';
+  const cur = {...a, condition: a.condition || 'Good', status: a.status || 'Active'};
+  const types = (!a.type || ASSET_TYPES.includes(a.type)) ? ASSET_TYPES : [a.type, ...ASSET_TYPES];
+  const locs = locations.some(l => l.id === a.locationId) ? locations : [{id: a.locationId, name: a.locationName || a.locationId}, ...locations];
+  const opt = (v, l, c) => `<option value="${escapeHtml(v)}" ${c===v?'selected':''}>${escapeHtml(l)}</option>`;
+  const $ = id => bg.querySelector('#' + id);
+  bg.innerHTML = `<div class="qr-modal edit-modal">
+    <h1 style="font-size:1.1rem;margin:0 0 4px;">Edit asset</h1>
+    <label>Asset name</label><input id="ea_name" type="text" value="${escapeHtml(cur.name||'')}">
+    <label>Type</label><select id="ea_type">${types.map(t => opt(t, t, cur.type)).join('')}</select>
+    <label>Location</label><select id="ea_loc">${locs.map(l => opt(l.id, l.name, cur.locationId)).join('')}</select>
+    <label>Assigned to</label><input id="ea_person" type="text" value="${escapeHtml(cur.assignedTo||'')}">
+    <label>Serial / asset tag</label><input id="ea_serial" type="text" value="${escapeHtml(cur.serial||'')}">
+    <label>Brand / model</label><input id="ea_model" type="text" value="${escapeHtml(cur.model||'')}">
+    <div class="two" style="gap:12px;">
+      <div><label>Purchase date</label><input id="ea_pdate" type="date" value="${escapeHtml(cur.purchaseDate||'')}"></div>
+      <div><label>Warranty until</label><input id="ea_warr" type="date" value="${escapeHtml(cur.warrantyUntil||'')}"></div>
+    </div>
+    <div class="two" style="gap:12px;">
+      <div><label>Condition</label><select id="ea_cond">${CONDITIONS.map(c => opt(c, c, cur.condition)).join('')}</select></div>
+      <div><label>Status</label><select id="ea_status">${ASSET_STATUSES.map(x => opt(x, x, cur.status)).join('')}</select></div>
+    </div>
+    <label>Notes</label><textarea id="ea_notes" style="min-height:64px;">${escapeHtml(cur.notes||'')}</textarea>
+    <button class="btn-primary" id="ea_save">Save changes</button>
+    <button class="btn-ghost" id="ea_cancel" style="width:100%;margin-top:8px;">Cancel</button>
+    <div id="ea_msg" class="ticket-meta" style="margin-top:10px;"></div>
+  </div>`;
+  document.body.appendChild(bg);
+  $('ea_cancel').onclick = () => bg.remove();
+  $('ea_save').onclick = async () => {
+    const msg = $('ea_msg');
+    const loc = locs.find(l => l.id === $('ea_loc').value);
+    const nv = {name: $('ea_name').value.trim(), type: $('ea_type').value, locationId: loc ? loc.id : cur.locationId, assignedTo: $('ea_person').value.trim(),
+      serial: $('ea_serial').value.trim(), model: $('ea_model').value.trim(), purchaseDate: $('ea_pdate').value, warrantyUntil: $('ea_warr').value,
+      condition: $('ea_cond').value, status: $('ea_status').value, notes: $('ea_notes').value.trim()};
+    if (!nv.name) { msg.style.color = 'var(--danger)'; msg.textContent = 'Asset name is required.'; return; }
+    const L = {name:'name', type:'type', locationId:'location', assignedTo:'assigned to', serial:'serial/tag', model:'model', purchaseDate:'purchase date', warrantyUntil:'warranty', condition:'condition', status:'status', notes:'notes'};
+    const changed = Object.keys(nv).filter(k => (cur[k] || '') !== nv[k]);
+    if (!changed.length) { msg.style.color = 'var(--muted)'; msg.textContent = 'No changes to save.'; return; }
+    const detail = [];
+    if (changed.includes('locationId')) detail.push('Location: ' + (cur.locationName || '—') + ' → ' + (loc ? loc.name : '—'));
+    if (changed.includes('assignedTo')) detail.push('Assigned to: ' + (cur.assignedTo || 'Unassigned') + ' → ' + (nv.assignedTo || 'Unassigned'));
+    if (changed.includes('condition')) detail.push('Condition: ' + cur.condition + ' → ' + nv.condition);
+    if (changed.includes('status')) detail.push('Status: ' + cur.status + ' → ' + nv.status);
+    const upd = {...nv, locationName: loc ? loc.name : cur.locationName,
+      history: [...(a.history || []), {type:'edit', at: Date.now(), by: lsGet('it_by') || '', note: detail.join('; '), changes: changed.map(k => L[k])}]};
+    $('ea_save').disabled = true; $('ea_save').textContent = 'Saving…';
+    try { await db.doc('assets/' + a.id).update(upd); bg.remove(); done(); }
+    catch(e){ $('ea_save').disabled = false; $('ea_save').textContent = 'Save changes'; msg.style.color = 'var(--danger)'; msg.textContent = "Couldn't save — check your connection and Firestore rules."; }
+  };
+}
+
+let assetTypeFilter = 'all', assetStatusFilter = 'all';
+async function renderAssetsTab(){
+  const body = document.getElementById('tabBody');
+  const [assets, locations] = await Promise.all([fetchAll('assets'), fetchAll('locations')]);
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  const types = Array.from(new Set([...ASSET_TYPES, ...assets.map(a => a.type).filter(Boolean)]));
+  const opt = (v, l, cur) => `<option value="${escapeHtml(v)}" ${cur===v?'selected':''}>${escapeHtml(l)}</option>`;
+
+  body.innerHTML = `
+    <details class="card" ${assets.length ? '' : 'open'}>
+      <summary>＋ Add asset</summary>
+      <div style="margin-top:16px;">
+      <label>Asset name</label>
+      <input id="a_name" type="text" placeholder="e.g. Dell OptiPlex 7010">
+      <label>Type</label>
+      <select id="a_type">${ASSET_TYPES.map(t => opt(t, t, '')).join('')}</select>
+      <label>Location</label>
+      <select id="a_loc">${locations.length ? locations.map(l => opt(l.id, l.name, '')).join('') : '<option value="">Add a location in Settings first</option>'}</select>
+      <label>Serial / asset tag (optional)</label>
+      <input id="a_serial" type="text" placeholder="e.g. SN-00231">
+      <label>Brand / model (optional)</label>
+      <input id="a_model" type="text" placeholder="e.g. Dell OptiPlex 7010">
+      <div class="two" style="gap:12px;">
+        <div><label>Purchase date</label><input id="a_pdate" type="date"></div>
+        <div><label>Warranty until</label><input id="a_warr" type="date"></div>
+      </div>
+      <label>Notes (optional)</label>
+      <textarea id="a_notes" style="min-height:64px;" placeholder="IP address, accessories, remarks…"></textarea>
+      <label>Status</label>
+      <select id="a_status">${ASSET_STATUSES.map(x => opt(x, x, '')).join('')}</select>
+      <label>Assigned to (optional)</label>
+      <input id="a_person" type="text" placeholder="e.g. Nadeesha Perera">
+      <label>Condition</label>
+      <select id="a_cond">${CONDITIONS.map(c => opt(c, c, 'Good')).join('')}</select>
+      <button class="btn-primary" id="addAssetBtn">Add Asset &amp; generate QR</button>
+      </div>
+    </details>
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <select id="fLoc" style="width:auto;"><option value="all">All locations</option>${locations.map(l => opt(l.id, l.name, assetLocFilter)).join('')}</select>
+      <select id="fType" style="width:auto;"><option value="all">All types</option>${types.map(t => opt(t, t, assetTypeFilter)).join('')}</select>
+      <select id="fStatus" style="width:auto;"><option value="all">All statuses</option>${ASSET_STATUSES.map(x => opt(x, x, assetStatusFilter)).join('')}</select>
+      <span class="ticket-meta" id="assetCount" style="margin-left:auto;"></span>
+      <button class="btn-ghost" id="assetXlsx">⬇ Excel report</button>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;"><table class="tbl">
+      <thead><tr><th>Asset</th><th>Type</th><th>Location</th><th>Assigned to</th><th>Serial / tag</th><th>Condition</th><th>Status</th><th></th></tr></thead>
+      <tbody id="assetRows"></tbody>
+    </table></div>
+  `;
+  const bindF = (id, set) => { const el = document.getElementById(id); el.onchange = e => { set(e.target.value); renderAssetsTab(); }; };
+  bindF('fLoc', v => assetLocFilter = v); bindF('fType', v => assetTypeFilter = v); bindF('fStatus', v => assetStatusFilter = v);
+
+  document.getElementById('addAssetBtn').onclick = async () => {
+    const name = document.getElementById('a_name').value.trim();
+    const locId = document.getElementById('a_loc').value;
+    if (!name || !locId) return;
+    const loc = locations.find(l => l.id === locId);
+    const id = 'asset_' + Date.now().toString(36);
+    const person = document.getElementById('a_person').value.trim();
+    await db.doc('assets/' + id).set({
+      id, name, type: document.getElementById('a_type').value,
+      locationId: locId, locationName: loc ? loc.name : locId,
+      serial: document.getElementById('a_serial').value.trim(),
+      model: document.getElementById('a_model').value.trim(), purchaseDate: document.getElementById('a_pdate').value,
+      warrantyUntil: document.getElementById('a_warr').value, notes: document.getElementById('a_notes').value.trim(),
+      status: document.getElementById('a_status').value, createdAt: Date.now(),
+      condition: document.getElementById('a_cond').value, assignedTo: person,
+      history: [{type:'created', at: Date.now(), by: '', note: '', person}]
+    });
+    await renderAssetsTab();
+    showQr(assetUrl(id), name, loc ? loc.name : '');
+  };
+
+  let rows = assets;
+  if (assetLocFilter !== 'all') rows = rows.filter(a => a.locationId === assetLocFilter);
+  if (assetTypeFilter !== 'all') rows = rows.filter(a => a.type === assetTypeFilter);
+  if (assetStatusFilter !== 'all') rows = rows.filter(a => a.status === assetStatusFilter);
+  rows = rows.slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  document.getElementById('assetCount').textContent = rows.length + ' of ' + assets.length + ' asset' + (assets.length === 1 ? '' : 's');
+  document.getElementById('assetXlsx').onclick = async e => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Preparing…'; try { await exportAssetsXlsx(rows); } finally { b.disabled = false; b.textContent = '⬇ Excel report'; } };
+  const stCls = x => x === 'Active' ? 'badge-resolved' : (x === 'In Repair' ? 'badge-in-progress' : 'badge-open');
+  const tb = document.getElementById('assetRows');
+  tb.innerHTML = rows.length ? rows.map(a => `
+    <tr>
+      <td><b>${escapeHtml(a.name)}</b>${a.model ? `<div class="ticket-meta" style="margin:2px 0 0;">${escapeHtml(a.model)}</div>` : ''}</td>
+      <td>${escapeHtml(a.type||'—')}</td>
+      <td>${escapeHtml(a.locationName||a.locationId||'—')}</td>
+      <td>${escapeHtml(a.assignedTo||'—')}</td>
+      <td>${escapeHtml(a.serial||'—')}</td>
+      <td><span class="badge ${condBadge(a.condition||'Good')}">${escapeHtml(a.condition||'Good')}</span></td>
+      <td><select class="status-select" data-id="${a.id}" style="margin:0;padding:5px 8px;">${ASSET_STATUSES.map(x => `<option value="${x}" ${a.status===x?'selected':''}>${x}</option>`).join('')}</select></td>
+      <td style="text-align:right;"><button class="btn-ghost edit-btn" data-id="${a.id}" style="padding:6px 11px;font-size:.78rem;">Edit</button>
+        <button class="btn-ghost qr-btn" data-id="${a.id}" style="padding:6px 11px;font-size:.78rem;">QR</button>
+        <a class="btn-ghost" href="${escapeHtml(assetUrl(a.id))}" target="_blank" style="padding:6px 11px;font-size:.78rem;">Open</a></td>
+    </tr>`).join('') : `<tr><td colspan="8" class="ticket-meta" style="text-align:center;padding:30px;">${assets.length ? 'No assets match these filters.' : 'No assets recorded yet.'}</td></tr>`;
+  tb.querySelectorAll('.qr-btn').forEach(b => b.onclick = () => {
+    const a = assets.find(x => x.id === b.dataset.id);
+    showQr(assetUrl(a.id), a.name, (a.type || '') + ' · ' + (a.serial || a.id));
+  });
+  tb.querySelectorAll('.edit-btn').forEach(b => b.onclick = () => openAssetEditor(assets.find(x => x.id === b.dataset.id), locations, renderAssetsTab));
+  tb.querySelectorAll('.status-select').forEach(sel => sel.onchange = async () => {
+    sel.disabled = true;
+    try { await db.doc('assets/' + sel.dataset.id).update({status: sel.value}); }
+    finally { renderAssetsTab(); }
+  });
+}
+
+async function renderLocationsTab(){
+  const body = document.getElementById('tabBody');
+  const [locations, tickets] = await Promise.all([fetchAll('locations'), fetchAll('tickets')]);
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  const counts = {};
+  tickets.forEach(t => { counts[t.locationId] = (counts[t.locationId]||0) + 1; });
+
+  body.innerHTML = `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <div class="loc-name">Ticket form QR code</div>
+          <div class="loc-count">One QR code for the form — people pick their location inside it.</div>
+        </div>
+        <button class="btn-ghost" id="showGeneralQr">Show QR</button>
+      </div>
+    </div>
+    <div class="card">
+      <label>Add a location</label>
+      <div class="add-row">
+        <input id="newLocName" type="text" placeholder="e.g. Colombo Store">
+        <button class="btn-primary" style="width:auto;margin-top:0;" id="addLocBtn">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      ${locations.length ? locations.map(l => `
+        <div class="loc-item">
+          <div>
+            <div class="loc-name">${escapeHtml(l.name)}</div>
+            <div class="loc-count">${counts[l.id]||0} ticket${(counts[l.id]||0)===1?'':'s'}</div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">No locations yet — add one above.</div>'}
+    </div>
+  `;
+  document.getElementById('addLocBtn').onclick = async () => {
+    const val = document.getElementById('newLocName').value.trim();
+    if (!val) return;
+    const id = 'loc_' + Date.now().toString(36);
+    await db.doc('locations/' + id).set({id, name: val, createdAt: Date.now()});
+    renderLocationsTab();
+  };
+  document.getElementById('showGeneralQr').onclick = () => showQr();
+}
+
+function showQr(url = formUrl(), title = 'IT Issue Report Form', sub = ''){
+  const bg = document.createElement('div');
+  bg.className = 'qr-modal-bg';
+  bg.innerHTML = `
+    <div class="qr-modal">
+      <h1 style="font-size:1.1rem;">${escapeHtml(title)}</h1>
+      ${sub ? `<div class="ticket-meta" style="margin:-4px 0 12px;">${escapeHtml(sub)}</div>` : ''}
+      <div id="qrCanvas"></div>
+      <div class="url">${escapeHtml(url)}</div>
+      <button class="link-btn" id="copyUrl">Copy link</button>
+      <br><br>
+      <button class="btn-ghost" id="printQr">Print label</button> <button class="btn-ghost" id="closeModal">Close</button>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const qrTarget = document.getElementById('qrCanvas');
+  if (window.QRCode) {
+    try {
+      new QRCode(qrTarget, {text: url, width: 220, height: 220, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M});
+    } catch(e) {
+      qrTarget.innerHTML = '<div style="color:var(--danger);font-size:.8rem;">Could not render QR code. Use the link below instead.</div>';
+    }
+  } else {
+    qrTarget.innerHTML = '<div style="color:var(--danger);font-size:.8rem;">QR library failed to load. Use the link below instead.</div>';
+  }
+  document.getElementById('printQr').onclick = () => {
+    const c = qrTarget.querySelector('canvas'), im = qrTarget.querySelector('img');
+    const src = c ? c.toDataURL() : (im ? im.src : '');
+    const w = window.open('', '_blank'); if (!w) return;
+    w.document.write(`<title>${escapeHtml(title)}</title><body style="font-family:sans-serif;text-align:center;margin:0;padding:16px"><div style="display:inline-block;border:2px solid #000;border-radius:10px;padding:14px;width:260px"><img src="${src}" style="width:220px;height:220px"><div style="font-weight:700;font-size:16px;margin-top:8px">${escapeHtml(title)}</div><div style="font-size:12px;margin-top:2px">${escapeHtml(sub)}</div></div><script>onload=function(){setTimeout(function(){print()},200)}<\/script></body>`);
+    w.document.close();
+  };
+  document.getElementById('closeModal').onclick = () => bg.remove();
+  bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+  document.getElementById('copyUrl').onclick = () => {
+    navigator.clipboard.writeText(url).then(()=>{ document.getElementById('copyUrl').textContent = 'Copied!'; });
+  };
+}
+
+// ---------- ASSET PAGE (opened by scanning the QR label) ----------
+const CONDITIONS = ["New","Good","Fair","Poor","Damaged"];
+const condBadge = c => ({New:'badge-resolved',Good:'badge-resolved',Fair:'badge-in-progress'}[c] || 'badge-open');
+function assetUrl(id){ return pageBaseUrl() + '?view=asset&id=' + encodeURIComponent(id); }
+
+async function renderAssetPage(id){
+  const app = document.getElementById('app');
+  const $ = x => document.getElementById(x);
+  const fail = (icon, t, m) => { app.innerHTML = `<div class="msg"><div class="big">${icon}</div><h1>${t}</h1><p class="sub">${m}</p></div>`; };
+  if (!db) return fail('⚠️', "Can't connect", escapeHtml(dbError || 'Database not available.'));
+  const [r, locations, tickets] = await Promise.all([id ? db.doc('assets/' + id).get() : null, fetchAll('locations'), fetchAll('tickets')]);
+  if (!r || !r.data) return fail('🔍', 'Asset not found', 'This QR code may be for an asset that was removed.');
+  const a = r.data;
+  const cond = a.condition || 'Good';
+  locations.sort((x,y) => (x.name||'').localeCompare(y.name||''));
+  const hist = (a.history || []).slice();
+  if (!hist.some(h => h.type === 'created')) hist.push({type:'created', at:a.createdAt || 0});
+  hist.sort((x,y) => (y.at||0) - (x.at||0));
+  const openT = tickets.filter(t => t.assetId === id && t.status !== 'resolved').length;
+  const ICON = {created:'✨', repair:'🔧', transfer:'🔁', condition:'📋', edit:'✏️'};
+  const P = x => x || 'Unassigned';
+  const title = h => h.type === 'created' ? 'Asset added' + (h.person ? ' · assigned to ' + h.person : '')
+    : h.type === 'repair' ? (h.outcome === 'completed' ? 'Repair completed' : 'Sent for repair') + (h.vendor ? ' · ' + h.vendor : '') + (h.cost ? ' · cost ' + h.cost : '')
+    : h.type === 'transfer' ? 'Transfer · ' + [
+        (h.from && h.from !== h.to) || h.fromPerson === undefined ? 'Location: ' + (h.from || '—') + ' → ' + h.to : '',
+        h.fromPerson !== undefined ? (h.fromPerson !== h.person ? 'Person: ' + P(h.fromPerson) + ' → ' + P(h.person) : '') : (h.person ? 'Assigned to ' + h.person : '')
+      ].filter(Boolean).join(' · ')
+    : h.type === 'edit' ? 'Details edited · ' + (h.changes || []).join(', ')
+    : 'Condition ' + (h.from || '—') + ' → ' + h.to;
+
+  app.innerHTML = `
+    <div class="ticket-meta" style="margin-bottom:6px;">Asset details</div>
+    <h1>${escapeHtml(a.name)}</h1>
+    <div style="margin:8px 0 4px;">
+      <span class="badge ${a.status==='Active'?'badge-resolved':a.status==='In Repair'?'badge-in-progress':'badge-open'}">${escapeHtml(a.status||'Active')}</span>
+      <span class="badge ${condBadge(cond)}">Condition: ${escapeHtml(cond)}</span>
+      ${openT ? `<span class="badge badge-open">${openT} open ticket${openT===1?'':'s'}</span>` : ''}
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="ticket-meta" style="margin:0;line-height:1.9;font-size:.88rem;">
+        <b>Type:</b> ${escapeHtml(a.type||'—')}<br>
+        <b>Location:</b> ${escapeHtml(a.locationName||'—')}<br>
+        <b>Serial / tag:</b> ${escapeHtml(a.serial||'—')}<br>
+        <b>Assigned to:</b> ${escapeHtml(a.assignedTo||'—')}<br>
+        <b>Brand / model:</b> ${escapeHtml(a.model||'—')}<br>
+        <b>Purchased:</b> ${escapeHtml(a.purchaseDate||'—')}<br>
+        <b>Warranty until:</b> ${escapeHtml(a.warrantyUntil||'—')}${a.warrantyUntil ? (a.warrantyUntil < new Date().toISOString().slice(0,10) ? ' <span class="badge badge-open">Expired</span>' : ' <span class="badge badge-resolved">Active</span>') : ''}<br>
+        ${a.notes ? '<b>Notes:</b> ' + escapeHtml(a.notes) + '<br>' : ''}
+        <b>Asset ID:</b> ${escapeHtml(a.id)}
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn-ghost" data-k="repair">🔧 Repair</button>
+      <button class="btn-ghost" data-k="transfer">🔁 Transfer</button>
+      <button class="btn-ghost" data-k="condition">📋 Condition</button>
+      <button class="btn-ghost" data-k="edit">✏️ Edit</button>
+    </div>
+    <div id="panel"></div>
+    <a class="btn-ghost" style="display:block;margin-bottom:18px;" href="${escapeHtml(formUrl() + '&asset=' + encodeURIComponent(id))}">Report an issue with this asset</a>
+    <h1 style="font-size:1.05rem;margin-bottom:12px;">History</h1>
+    <div class="card">${hist.map(h => `
+      <div class="hist"><b>${ICON[h.type]||'•'} ${escapeHtml(title(h))}</b>
+        ${h.note ? `<div class="ticket-desc" style="margin-top:4px;">${escapeHtml(h.note)}</div>` : ''}
+        <div class="ticket-meta">${h.at ? new Date(h.at).toLocaleString() : ''}${h.by ? ' · ' + escapeHtml(h.by) : ''}</div>
+      </div>`).join('')}
+    </div>`;
+
+  const forms = {
+    repair: () => `<label>Repair status</label><select id="p_outcome"><option value="started">Sent / repair started</option><option value="completed">Repair completed</option></select>
+      <label>Vendor / technician (optional)</label><input id="p_vendor" type="text">
+      <label>Cost (optional)</label><input id="p_cost" type="number" min="0" inputmode="decimal">
+      <label>Details</label><textarea id="p_note" placeholder="What was wrong / what was done?"></textarea>`,
+    transfer: () => `
+      <div class="ticket-meta" style="background:var(--bg);border-radius:var(--radius-sm);padding:11px 13px;margin:0 0 4px;line-height:1.7;">
+        <b>From</b><br>Location: ${escapeHtml(a.locationName||'—')}<br>Person: ${escapeHtml(a.assignedTo||'Unassigned')}
+      </div>
+      <label>To location</label><select id="p_loc">${locations.map(l=>`<option value="${l.id}" ${l.id===a.locationId?'selected':''}>${escapeHtml(l.name)}</option>`).join('')}</select>
+      <label>To person (leave empty for unassigned)</label><input id="p_person" type="text" value="${escapeHtml(a.assignedTo||'')}">
+      <label>Note</label><textarea id="p_note" placeholder="Reason for transfer"></textarea>`,
+    edit: () => `<label>Asset name</label><input id="e_name" type="text" value="${escapeHtml(a.name||'')}">
+      <label>Type</label><select id="e_type">${(ASSET_TYPES.includes(a.type) ? ASSET_TYPES : [a.type, ...ASSET_TYPES]).map(t=>`<option value="${escapeHtml(t)}" ${t===a.type?'selected':''}>${escapeHtml(t)}</option>`).join('')}</select>
+      <label>Serial / asset tag</label><input id="e_serial" type="text" value="${escapeHtml(a.serial||'')}">
+      <label>Brand / model</label><input id="e_model" type="text" value="${escapeHtml(a.model||'')}">
+      <div class="two" style="gap:12px;">
+        <div><label>Purchase date</label><input id="e_pdate" type="date" value="${escapeHtml(a.purchaseDate||'')}"></div>
+        <div><label>Warranty until</label><input id="e_warr" type="date" value="${escapeHtml(a.warrantyUntil||'')}"></div>
+      </div>
+      <label>Notes</label><textarea id="e_notes" style="min-height:64px;">${escapeHtml(a.notes||'')}</textarea>
+      <label>Reason for change (optional)</label><textarea id="p_note" style="min-height:52px;"></textarea>`,
+    condition: () => `<label>Condition</label><select id="p_cond">${CONDITIONS.map(c=>`<option value="${c}" ${c===cond?'selected':''}>${c}</option>`).join('')}</select>
+      <label>Note</label><textarea id="p_note" placeholder="e.g. cracked screen, battery weak"></textarea>`
+  };
+  app.querySelectorAll('.acts button').forEach(b => b.onclick = () => {
+    app.querySelectorAll('.acts button').forEach(x => x.classList.toggle('on', x === b));
+    const kind = b.dataset.k;
+    $('panel').innerHTML = `<div class="card">${forms[kind]()}
+      <label>Your name</label><input id="p_by" type="text" value="${escapeHtml(lsGet('it_by')||'')}">
+      <button class="btn-primary" id="p_save">Save</button><div id="p_msg" class="ticket-meta" style="margin-top:10px;"></div></div>`;
+    $('p_save').onclick = async () => {
+      const by = $('p_by').value.trim(); lsSet('it_by', by);
+      const entry = {type:kind, at:Date.now(), by, note: $('p_note').value.trim()};
+      const upd = {};
+      if (kind === 'repair') {
+        entry.outcome = $('p_outcome').value; entry.vendor = $('p_vendor').value.trim(); entry.cost = $('p_cost').value;
+        upd.status = entry.outcome === 'completed' ? 'Active' : 'In Repair';
+      } else if (kind === 'transfer') {
+        const loc = locations.find(l => l.id === $('p_loc').value);
+        const person = $('p_person').value.trim();
+        if (!loc || (loc.id === a.locationId && person === (a.assignedTo||''))) { $('p_msg').textContent = 'Change the location or the person to record a transfer.'; return; }
+        entry.from = a.locationName || ''; entry.to = loc.name; entry.fromPerson = a.assignedTo || ''; entry.person = person;
+        Object.assign(upd, {locationId: loc.id, locationName: loc.name, assignedTo: person});
+      } else if (kind === 'edit') {
+        const nv = {name:$('e_name').value.trim(), type:$('e_type').value, serial:$('e_serial').value.trim(), model:$('e_model').value.trim(),
+          purchaseDate:$('e_pdate').value, warrantyUntil:$('e_warr').value, notes:$('e_notes').value.trim()};
+        if (!nv.name) { $('p_msg').textContent = 'Asset name is required.'; return; }
+        const L = {name:'name', type:'type', serial:'serial/tag', model:'model', purchaseDate:'purchase date', warrantyUntil:'warranty', notes:'notes'};
+        const changed = Object.keys(nv).filter(k => (a[k] || '') !== nv[k]);
+        if (!changed.length) { $('p_msg').textContent = 'No changes to save.'; return; }
+        entry.changes = changed.map(k => L[k]);
+        Object.assign(upd, nv);
+      } else {
+        entry.from = cond; entry.to = $('p_cond').value; upd.condition = entry.to;
+        if (entry.to === cond && !entry.note) { $('p_msg').textContent = 'Change the condition or add a note.'; return; }
+      }
+      upd.history = [...(a.history || []), entry];
+      $('p_save').disabled = true; $('p_save').textContent = 'Saving…';
+      try { await db.doc('assets/' + id).update(upd); await renderAssetPage(id); }
+      catch(e){ $('p_save').disabled = false; $('p_save').textContent = 'Save'; $('p_msg').style.color = 'var(--danger)'; $('p_msg').textContent = "Couldn't save — check your connection."; }
+    };
+  });
+}
+
+// ---------- helpers ----------
+function label(s){ return s.split('-').map(w=>w[0].toUpperCase()+w.slice(1)).join(' '); }
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function timeAgo(ts){
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+}
+
+init();
+</script>
+</body>
+</html>
