@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IT Issue Reporting</title>
+<script src="https://cdn.jsdelivr.net/npm/davidshimjs-qrcodejs@0.0.2/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --text:#1b1e27; --muted:#767b8a;
+  --border:#e7e9f0; --accent:#4f46e5; --accent-soft:#eef0fe; --accent-fg:#ffffff;
+  --danger:#e0332f; --danger-soft:#fdeaea;
+  --warn:#c8720a; --warn-soft:#fdf3e2;
+  --ok:#0e8f52; --ok-soft:#e6f7ee;
+  --radius:14px; --radius-sm:9px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%;}
+*{box-sizing:border-box;}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;}
+.wrap{max-width:720px;margin:0 auto;padding:28px 18px 60px;}
+h1{font-size:1.4rem;margin:4px 0 2px;font-weight:700;letter-spacing:-0.01em;}
+.sub{color:var(--muted);font-size:.92rem;margin-bottom:22px;line-height:1.4;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;
+  margin-bottom:16px;box-shadow:0 1px 2px rgba(20,20,43,.03);}
+label{display:block;font-size:.82rem;font-weight:600;color:var(--text);margin:16px 0 6px;}
+label:first-child{margin-top:0;}
+input,select,textarea{width:100%;padding:11px 13px;border-radius:var(--radius-sm);border:1.5px solid var(--border);
+  background:var(--bg);color:var(--text);font-size:.95rem;font-family:inherit;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--card);}
+textarea{min-height:90px;resize:vertical;}
+button{cursor:pointer;border:none;border-radius:var(--radius-sm);padding:12px 18px;font-size:.95rem;font-weight:600;
+  transition:opacity .15s, transform .05s;}
+button:active{transform:scale(.98);}
+.btn-primary{background:var(--accent);color:var(--accent-fg);width:100%;margin-top:18px;}
+.btn-primary:hover{opacity:.92;}
+.btn-primary:disabled{opacity:.5;cursor:default;}
+.btn-ghost{background:var(--accent-soft);color:var(--accent);border:1px solid transparent;}
+.btn-ghost:hover{opacity:.85;}
+.tabs{display:flex;gap:6px;margin-bottom:18px;overflow-x:auto;padding-bottom:2px;}
+.tab{padding:8px 15px;border-radius:20px;border:1px solid var(--border);background:var(--card);
+  color:var(--muted);font-size:.84rem;font-weight:600;white-space:nowrap;cursor:pointer;transition:.15s;}
+.tab.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);}
+.row{display:flex;gap:10px;align-items:center;}
+.grow{flex:1;}
+.badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
+.badge-open{background:var(--danger-soft);color:var(--danger);}
+.badge-in-progress{background:var(--warn-soft);color:var(--warn);}
+.badge-resolved{background:var(--ok-soft);color:var(--ok);}
+.ticket{border:1px solid var(--border);border-radius:var(--radius-sm);padding:15px;margin-bottom:10px;background:var(--card);}
+.ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.ticket-meta{color:var(--muted);font-size:.78rem;margin-top:5px;}
+.ticket-desc{margin-top:9px;font-size:.9rem;line-height:1.45;}
+.status-select{width:auto;padding:7px 10px;font-size:.78rem;margin-top:11px;}
+.empty{color:var(--muted);text-align:center;padding:34px 10px;font-size:.9rem;background:var(--card);
+  border:1px dashed var(--border);border-radius:var(--radius);}
+.loc-item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);}
+.loc-item:last-child{border-bottom:none;}
+.loc-name{font-weight:600;}
+.loc-count{color:var(--muted);font-size:.8rem;}
+.qr-modal-bg{position:fixed;inset:0;background:rgba(20,20,43,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+.qr-modal{background:var(--card);border-radius:var(--radius);padding:26px;max-width:340px;width:100%;text-align:center;
+  box-shadow:0 20px 60px rgba(20,20,43,.25);}
+.qr-modal canvas,.qr-modal img{max-width:100%;border-radius:8px;}
+#qrCanvas{display:flex;justify-content:center;}
+.qr-modal .url{font-size:.72rem;color:var(--muted);word-break:break-all;margin:12px 0;}
+.msg{text-align:center;padding:60px 16px;}
+.msg .big{font-size:2.4rem;}
+.add-row{display:flex;gap:8px;margin-top:6px;}
+.add-row input{flex:1;}
+.add-row button{white-space:nowrap;}
+.link-btn{background:none;border:none;color:var(--accent);font-size:.8rem;padding:0;font-weight:600;}
+table{width:100%;border-collapse:collapse;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="msg"><div class="big">⏳</div><p>Loading…</p></div></div>
+
+<script>
+const CATEGORIES = ["Hardware","Software","Network/Wi-Fi","Printer","Account/Access","POS Terminal","Other"];
+const URGENCY = ["Low","Medium","High","Critical"];
+const STATUSES = ["open","in-progress","resolved"];
+const URGENCY_HOURS = {Critical:4, High:24, Medium:72, Low:168};
+
+let db = null;
+let downloadsCap = null;
+let user = null;
+const params = new URLSearchParams(location.search);
+const view = params.get('view'); // 'form' or 'admin' — no other way in
+
+function pageBaseUrl(){
+  return location.origin + location.pathname;
+}
+function formUrl(){ return pageBaseUrl() + '?view=form'; }
+function adminUrl(){ return pageBaseUrl() + '?view=admin'; }
+
+async function init(){
+  try { db = (window.claude && window.claude.use) ? await window.claude.use("db") : null; } catch(e){ db = null; }
+  try { downloadsCap = (window.claude && window.claude.use) ? await window.claude.use("downloads") : null; } catch(e){ downloadsCap = null; }
+  try { user = (window.claude && window.claude.use) ? await window.claude.use("user") : null; } catch(e){ user = null; }
+  try {
+    if (view === 'form') {
+      await renderForm();
+    } else {
+      await renderAdmin();
+    }
+  } catch(e){
+    document.getElementById('app').innerHTML = '<div class="msg"><div class="big">⚠️</div><h1>Something went wrong</h1><p class="sub">' + escapeHtml(e && e.message ? e.message : 'Please refresh the page.') + '</p></div>';
+  }
+}
+
+// ---------- FORM VIEW ----------
+async function renderForm(){
+  const app = document.getElementById('app');
+  const locations = db ? await fetchAll('locations') : [];
+  const assets = db ? await fetchAll('assets') : [];
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  const assetOptions = (locId) => {
+    const filtered = assets.filter(a => a.locationId === locId);
+    return '<option value="">None</option>' + filtered.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  };
+  app.innerHTML = `
+    <h1>Report an IT Issue</h1>
+    <div class="sub">Fill this in and IT will pick it up.</div>
+    <div class="card">
+      <label>Location</label>
+      <select id="f_loc">
+        ${locations.length ? locations.map(l=>`<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('') : '<option value="">No locations set up yet</option>'}
+      </select>
+      <label>Related asset (optional)</label>
+      <select id="f_asset">${locations.length ? assetOptions(locations[0].id) : '<option value="">None</option>'}</select>
+      <label>Person raising the ticket</label>
+      <input id="f_name" type="text" placeholder="e.g. Nadeesha Perera">
+      <label>Department</label>
+      <input id="f_dept" type="text" placeholder="e.g. Sales, Warehouse">
+      <label>Request</label>
+      <select id="f_cat">${CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      <label>Urgency</label>
+      <select id="f_urg">${URGENCY.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>
+      <label>Issue</label>
+      <textarea id="f_desc" placeholder="What's happening? What have you already tried?"></textarea>
+      <button class="btn-primary" id="submitBtn">Submit Ticket</button>
+      <div id="formMsg" class="ticket-meta" style="margin-top:10px;"></div>
+    </div>
+  `;
+  document.getElementById('f_loc').onchange = (e) => {
+    document.getElementById('f_asset').innerHTML = assetOptions(e.target.value);
+  };
+  document.getElementById('submitBtn').onclick = () => submitTicket(locations, assets);
+}
+
+async function submitTicket(locations, assets){
+  const locId = document.getElementById('f_loc').value;
+  const loc = locations.find(l => l.id === locId);
+  const assetId = document.getElementById('f_asset').value;
+  const asset = assets.find(a => a.id === assetId);
+  const name = document.getElementById('f_name').value.trim();
+  const dept = document.getElementById('f_dept').value.trim();
+  const desc = document.getElementById('f_desc').value.trim();
+  const cat = document.getElementById('f_cat').value;
+  const urg = document.getElementById('f_urg').value;
+  const msgEl = document.getElementById('formMsg');
+  if (!locId) { msgEl.textContent = "Please select a location."; msgEl.style.color = 'var(--danger)'; return; }
+  if (!desc) { msgEl.textContent = "Please describe the issue."; msgEl.style.color = 'var(--danger)'; return; }
+  if (!db) { msgEl.textContent = "Storage unavailable in this preview — this works once published."; msgEl.style.color='var(--danger)'; return; }
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = "Submitting…";
+  const id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  const createdAt = Date.now();
+  try {
+    await db.doc('tickets/' + id).set({
+      id, locationId: locId, locationName: loc ? loc.name : locId,
+      assetId: assetId || null, assetName: asset ? asset.name : null,
+      reporterName: name || 'Anonymous', department: dept,
+      category: cat, urgency: urg, description: desc,
+      status: 'open', assignedTo: '',
+      dueBy: createdAt + (URGENCY_HOURS[urg] || 72) * 3600000,
+      createdAt
+    });
+    document.getElementById('app').innerHTML = `
+      <div class="msg"><div class="big">✅</div>
+      <h1>Ticket submitted</h1>
+      <p class="sub">IT has been notified. Thanks for the report!</p></div>`;
+  } catch(e){
+    btn.disabled = false; btn.textContent = "Submit Ticket";
+    msgEl.textContent = "Couldn't submit — " + (e && e.code === 'not_granted' ? "you need access to this page to submit tickets." : "please try again.");
+    msgEl.style.color = 'var(--danger)';
+  }
+}
+
+// ---------- ADMIN VIEW ----------
+let adminTab = 'tickets';
+let statusFilter = 'all';
+let locFilter = 'all';
+let assetLocFilter = 'all';
+
+async function renderAdmin(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <h1>IT Issue Dashboard</h1>
+    <div class="sub">Manage locations, generate QR codes, and track tickets.</div>
+    <div class="tabs">
+      <div class="tab ${adminTab==='tickets'?'active':''}" data-tab="tickets">Tickets</div>
+      <div class="tab ${adminTab==='reports'?'active':''}" data-tab="reports">Reports</div>
+      <div class="tab ${adminTab==='assets'?'active':''}" data-tab="assets">IT Assets</div>
+      <div class="tab ${adminTab==='locations'?'active':''}" data-tab="locations">Locations & QR</div>
+    </div>
+    <div id="tabBody"></div>
+  `;
+  app.querySelectorAll('.tab').forEach(t => t.onclick = () => { adminTab = t.dataset.tab; renderAdmin(); });
+  if (!db) {
+    document.getElementById('tabBody').innerHTML = `<div class="empty">Storage isn't available in this preview. Publish the page to enable live data.</div>`;
+    return;
+  }
+  if (adminTab === 'tickets') await renderTicketsTab();
+  else if (adminTab === 'reports') await renderReportsTab();
+  else if (adminTab === 'assets') await renderAssetsTab();
+  else await renderLocationsTab();
+}
+
+async function fetchAll(collection){
+  try {
+    const snap = await db.collection(collection).get();
+    return (snap && snap.docs) ? snap.docs.map(d => d.data) : [];
+  } catch(e){ return []; }
+}
+
+async function renderTicketsTab(){
+  const body = document.getElementById('tabBody');
+  const [tickets, locations] = await Promise.all([fetchAll('tickets'), fetchAll('locations')]);
+  tickets.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+
+  const locOptions = ['all', ...locations.map(l=>l.id)];
+  body.innerHTML = `
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <select id="statusFilter" style="width:auto;">
+        <option value="all">All statuses</option>
+        ${STATUSES.map(s=>`<option value="${s}" ${statusFilter===s?'selected':''}>${label(s)}</option>`).join('')}
+      </select>
+      <select id="locFilter" style="width:auto;">
+        <option value="all">All locations</option>
+        ${locations.map(l=>`<option value="${l.id}" ${locFilter===l.id?'selected':''}>${escapeHtml(l.name)}</option>`).join('')}
+      </select>
+      <button class="btn-ghost" id="exportTicketsCsv" style="margin-left:auto;">Export CSV</button>
+    </div>
+    <div id="ticketList"></div>
+  `;
+  document.getElementById('statusFilter').value = statusFilter;
+  document.getElementById('locFilter').value = locFilter;
+  document.getElementById('statusFilter').onchange = e => { statusFilter = e.target.value; renderTicketsTab(); };
+  document.getElementById('locFilter').onchange = e => { locFilter = e.target.value; renderTicketsTab(); };
+  document.getElementById('exportTicketsCsv').onclick = () => exportCsv('tickets',
+    ['id','locationName','assetName','reporterName','department','category','urgency','status','assignedTo','description','createdAt','dueBy'], tickets);
+
+  let filtered = tickets;
+  if (statusFilter !== 'all') filtered = filtered.filter(t => t.status === statusFilter);
+  if (locFilter !== 'all') filtered = filtered.filter(t => t.locationId === locFilter);
+
+  const list = document.getElementById('ticketList');
+  if (!filtered.length) { list.innerHTML = `<div class="empty">No tickets match this filter.</div>`; return; }
+  const now = Date.now();
+  list.innerHTML = filtered.map(t => {
+    const overdue = t.status !== 'resolved' && t.dueBy && t.dueBy < now;
+    return `
+    <div class="ticket">
+      <div class="ticket-top">
+        <div>
+          <span class="badge badge-${t.status}">${label(t.status)}</span>
+          ${overdue ? '<span class="badge badge-open" style="margin-left:6px;">Overdue</span>' : ''}
+          <div class="ticket-meta">${escapeHtml(t.locationName||t.locationId)}${t.assetName ? ' · ' + escapeHtml(t.assetName) : ''} · ${escapeHtml(t.category)} · ${escapeHtml(t.urgency)} urgency</div>
+        </div>
+        <div class="ticket-meta">${timeAgo(t.createdAt)}</div>
+      </div>
+      <div class="ticket-desc">${escapeHtml(t.description)}</div>
+      <div class="ticket-meta">Reported by ${escapeHtml(t.reporterName)}${t.department ? ' · ' + escapeHtml(t.department) : ''}${t.dueBy ? ' · Due ' + new Date(t.dueBy).toLocaleString() : ''}</div>
+      <div class="row" style="margin-top:11px;flex-wrap:wrap;gap:8px;">
+        <select class="status-select" data-id="${t.id}" style="margin-top:0;">
+          ${STATUSES.map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${label(s)}</option>`).join('')}
+        </select>
+        <input class="assign-input" data-id="${t.id}" type="text" value="${escapeHtml(t.assignedTo||'')}" placeholder="Assign to…" style="width:auto;flex:1;min-width:120px;padding:7px 10px;font-size:.78rem;">
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.status-select').forEach(sel => {
+    sel.onchange = async () => {
+      sel.disabled = true;
+      try { await db.doc('tickets/' + sel.dataset.id).update({status: sel.value}); }
+      finally { renderTicketsTab(); }
+    };
+  });
+  list.querySelectorAll('.assign-input').forEach(inp => {
+    inp.onchange = async () => {
+      try { await db.doc('tickets/' + inp.dataset.id).update({assignedTo: inp.value.trim()}); } catch(e){}
+    };
+  });
+}
+
+function toCsvValue(v){
+  const s = v == null ? '' : String(v);
+  return '"' + s.replace(/"/g,'""') + '"';
+}
+async function exportCsv(name, cols, rows){
+  const lines = [cols.join(',')];
+  rows.forEach(r => {
+    lines.push(cols.map(c => {
+      let v = r[c];
+      if (c === 'createdAt' || c === 'dueBy') v = v ? new Date(v).toISOString() : '';
+      return toCsvValue(v);
+    }).join(','));
+  });
+  const csv = lines.join('\n');
+  if (downloadsCap) {
+    try { await downloadsCap.save({filename: name + '.csv', data: csv}); return; } catch(e){}
+  }
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.csv';
+  a.click();
+}
+
+function monthKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function monthLabel(key){
+  const [y,m] = key.split('-');
+  return new Date(y, m-1, 1).toLocaleString('default',{month:'long', year:'numeric'});
+}
+
+async function renderReportsTab(){
+  const body = document.getElementById('tabBody');
+  const tickets = await fetchAll('tickets');
+  if (!tickets.length) { body.innerHTML = `<div class="empty">No tickets yet — reports will show up here once issues are reported.</div>`; return; }
+
+  const byMonth = {}, byLoc = {};
+  tickets.forEach(t => {
+    const mk = monthKey(t.createdAt || Date.now());
+    byMonth[mk] = byMonth[mk] || {total:0, resolved:0, open:0, inprog:0};
+    byMonth[mk].total++;
+    if (t.status === 'resolved') byMonth[mk].resolved++;
+    else if (t.status === 'in-progress') byMonth[mk].inprog++;
+    else byMonth[mk].open++;
+
+    const lk = t.locationName || t.locationId || 'Unknown';
+    byLoc[lk] = byLoc[lk] || {total:0, resolved:0, open:0, inprog:0};
+    byLoc[lk].total++;
+    if (t.status === 'resolved') byLoc[lk].resolved++;
+    else if (t.status === 'in-progress') byLoc[lk].inprog++;
+    else byLoc[lk].open++;
+  });
+
+  const monthRows = Object.keys(byMonth).sort().reverse().map(k => {
+    const r = byMonth[k];
+    return `<tr><td>${monthLabel(k)}</td><td>${r.total}</td><td>${r.open}</td><td>${r.inprog}</td><td>${r.resolved}</td></tr>`;
+  }).join('');
+  const locRows = Object.keys(byLoc).sort().map(k => {
+    const r = byLoc[k];
+    return `<tr><td>${escapeHtml(k)}</td><td>${r.total}</td><td>${r.open}</td><td>${r.inprog}</td><td>${r.resolved}</td></tr>`;
+  }).join('');
+  const tableStyle = 'width:100%;border-collapse:collapse;font-size:.85rem;';
+  const thtd = 'text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);';
+  const th = 'text-align:left;padding:9px 8px;border-bottom:1.5px solid var(--border);color:var(--muted);font-size:.78rem;font-weight:700;';
+
+  body.innerHTML = `
+    <div class="row" style="margin-bottom:14px;">
+      <button class="btn-ghost" id="exportFullCsv" style="margin-left:auto;">Export all tickets (CSV)</button>
+    </div>
+    <div class="card">
+      <h1 style="font-size:1rem;margin-bottom:10px;">Monthly report</h1>
+      <div style="overflow-x:auto;"><table style="${tableStyle}">
+        <thead><tr><th style="${th}">Month</th><th style="${th}">Total</th><th style="${th}">Open</th><th style="${th}">In Progress</th><th style="${th}">Resolved</th></tr></thead>
+        <tbody>${monthRows}</tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h1 style="font-size:1rem;margin-bottom:10px;">Location report</h1>
+      <div style="overflow-x:auto;"><table style="${tableStyle}">
+        <thead><tr><th style="${th}">Location</th><th style="${th}">Total</th><th style="${th}">Open</th><th style="${th}">In Progress</th><th style="${th}">Resolved</th></tr></thead>
+        <tbody>${locRows}</tbody>
+      </table></div>
+    </div>
+  `;
+  document.getElementById('exportFullCsv').onclick = () => exportCsv('tickets_report',
+    ['id','locationName','assetName','reporterName','department','category','urgency','status','assignedTo','description','createdAt','dueBy'], tickets);
+}
+
+// ---------- ASSETS TAB ----------
+const ASSET_TYPES = ["Laptop","Desktop","Monitor","Printer","Router/Switch","POS Terminal","Phone/Tablet","Other"];
+const ASSET_STATUSES = ["Active","In Repair","Retired"];
+
+async function renderAssetsTab(){
+  const body = document.getElementById('tabBody');
+  const [assets, locations] = await Promise.all([fetchAll('assets'), fetchAll('locations')]);
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  body.innerHTML = `
+    <div class="card">
+      <label>Asset name</label>
+      <input id="a_name" type="text" placeholder="e.g. Dell OptiPlex 7010">
+      <label>Type</label>
+      <select id="a_type">${ASSET_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      <label>Location</label>
+      <select id="a_loc">${locations.length ? locations.map(l=>`<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('') : '<option value="">Add a location first</option>'}</select>
+      <label>Serial / asset tag (optional)</label>
+      <input id="a_serial" type="text" placeholder="e.g. SN-00231">
+      <label>Status</label>
+      <select id="a_status">${ASSET_STATUSES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
+      <button class="btn-primary" id="addAssetBtn">Add Asset</button>
+    </div>
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <select id="assetLocFilter" style="width:auto;">
+        <option value="all">All locations</option>
+        ${locations.map(l=>`<option value="${l.id}" ${assetLocFilter===l.id?'selected':''}>${escapeHtml(l.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="assetList"></div>
+  `;
+  document.getElementById('assetLocFilter').value = assetLocFilter;
+  document.getElementById('assetLocFilter').onchange = e => { assetLocFilter = e.target.value; renderAssetsTab(); };
+  document.getElementById('addAssetBtn').onclick = async () => {
+    const name = document.getElementById('a_name').value.trim();
+    const locId = document.getElementById('a_loc').value;
+    if (!name || !locId) return;
+    const loc = locations.find(l => l.id === locId);
+    const id = 'asset_' + Date.now().toString(36);
+    await db.doc('assets/' + id).set({
+      id, name, type: document.getElementById('a_type').value,
+      locationId: locId, locationName: loc ? loc.name : locId,
+      serial: document.getElementById('a_serial').value.trim(),
+      status: document.getElementById('a_status').value, createdAt: Date.now()
+    });
+    renderAssetsTab();
+  };
+
+  let filtered = assets;
+  if (assetLocFilter !== 'all') filtered = filtered.filter(a => a.locationId === assetLocFilter);
+  const list = document.getElementById('assetList');
+  if (!filtered.length) { list.innerHTML = `<div class="empty">No assets recorded yet.</div>`; return; }
+  const statusBadge = s => s === 'Active' ? 'badge-resolved' : (s === 'In Repair' ? 'badge-in-progress' : 'badge-open');
+  list.innerHTML = filtered.map(a => `
+    <div class="ticket">
+      <div class="ticket-top">
+        <div>
+          <span class="badge ${statusBadge(a.status)}">${escapeHtml(a.status)}</span>
+          <div class="ticket-meta">${escapeHtml(a.type)} · ${escapeHtml(a.locationName||a.locationId)}${a.serial ? ' · ' + escapeHtml(a.serial) : ''}</div>
+        </div>
+      </div>
+      <div class="ticket-desc" style="font-weight:600;">${escapeHtml(a.name)}</div>
+      <select class="status-select" data-id="${a.id}">
+        ${ASSET_STATUSES.map(s=>`<option value="${s}" ${a.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+  list.querySelectorAll('.status-select').forEach(sel => {
+    sel.onchange = async () => {
+      sel.disabled = true;
+      try { await db.doc('assets/' + sel.dataset.id).update({status: sel.value}); }
+      finally { renderAssetsTab(); }
+    };
+  });
+}
+
+async function renderLocationsTab(){
+  const body = document.getElementById('tabBody');
+  const [locations, tickets] = await Promise.all([fetchAll('locations'), fetchAll('tickets')]);
+  locations.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  const counts = {};
+  tickets.forEach(t => { counts[t.locationId] = (counts[t.locationId]||0) + 1; });
+
+  body.innerHTML = `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <div class="loc-name">Ticket form QR code</div>
+          <div class="loc-count">One QR code for the form — people pick their location inside it.</div>
+        </div>
+        <button class="btn-ghost" id="showGeneralQr">Show QR</button>
+      </div>
+    </div>
+    <div class="card">
+      <label>Add a location</label>
+      <div class="add-row">
+        <input id="newLocName" type="text" placeholder="e.g. Colombo Store">
+        <button class="btn-primary" style="width:auto;margin-top:0;" id="addLocBtn">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      ${locations.length ? locations.map(l => `
+        <div class="loc-item">
+          <div>
+            <div class="loc-name">${escapeHtml(l.name)}</div>
+            <div class="loc-count">${counts[l.id]||0} ticket${(counts[l.id]||0)===1?'':'s'}</div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">No locations yet — add one above.</div>'}
+    </div>
+  `;
+  document.getElementById('addLocBtn').onclick = async () => {
+    const val = document.getElementById('newLocName').value.trim();
+    if (!val) return;
+    const id = 'loc_' + Date.now().toString(36);
+    await db.doc('locations/' + id).set({id, name: val, createdAt: Date.now()});
+    renderLocationsTab();
+  };
+  document.getElementById('showGeneralQr').onclick = () => showQr();
+}
+
+function showQr(){
+  const url = formUrl();
+  const bg = document.createElement('div');
+  bg.className = 'qr-modal-bg';
+  bg.innerHTML = `
+    <div class="qr-modal">
+      <h1 style="font-size:1.1rem;">IT Issue Report Form</h1>
+      <div id="qrCanvas"></div>
+      <div class="url">${escapeHtml(url)}</div>
+      <button class="link-btn" id="copyUrl">Copy link</button>
+      <br><br>
+      <button class="btn-ghost" id="closeModal">Close</button>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const qrTarget = document.getElementById('qrCanvas');
+  if (window.QRCode) {
+    try {
+      new QRCode(qrTarget, {text: url, width: 220, height: 220, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M});
+    } catch(e) {
+      qrTarget.innerHTML = '<div style="color:var(--danger);font-size:.8rem;">Could not render QR code. Use the link below instead.</div>';
+    }
+  } else {
+    qrTarget.innerHTML = '<div style="color:var(--danger);font-size:.8rem;">QR library failed to load. Use the link below instead.</div>';
+  }
+  document.getElementById('closeModal').onclick = () => bg.remove();
+  bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+  document.getElementById('copyUrl').onclick = () => {
+    navigator.clipboard.writeText(url).then(()=>{ document.getElementById('copyUrl').textContent = 'Copied!'; });
+  };
+}
+
+// ---------- helpers ----------
+function label(s){ return s.split('-').map(w=>w[0].toUpperCase()+w.slice(1)).join(' '); }
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function timeAgo(ts){
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+}
+
+init();
+</script>
+</body>
+</html>
